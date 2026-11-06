@@ -14,6 +14,8 @@ app/              Go/Wails desktop app
 .spikes/          Product requirements and research
 ```
 
+The frontend includes the full shadcn/ui Radix Nova component set and a charcoal/mint Penguin theme. See the [UI guide](app/frontend/README.md) for imports, theme tokens, and accessibility coverage.
+
 One pnpm workspace and lockfile manage JavaScript dependencies. The desktop app has its own Go module and checks. Add shared packages when there is code to share.
 
 ## Requirements
@@ -21,7 +23,7 @@ One pnpm workspace and lockfile manage JavaScript dependencies. The desktop app 
 - Node.js 24 (see `.node-version`).
 - pnpm 10.28.1 (the root `packageManager` field pins it).
 - Go 1.27.3.
-- macOS 13 or newer: Xcode Command Line Tools (`xcode-select --install`).
+- macOS 13.3 or newer: Xcode Command Line Tools (`xcode-select --install`).
 
 The initial target is Apple Silicon macOS. Windows and Linux development also requires platform-specific native dependencies.
 

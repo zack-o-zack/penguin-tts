@@ -12,7 +12,7 @@ pnpm test:e2e:install
 pnpm test:e2e
 ```
 
-The root test command generates Wails bindings and builds the frontend before Playwright starts. Playwright compiles and starts the headless Go app on `127.0.0.1:9473`, waits for HTTP readiness, and shuts down its process tree afterward. No running development app is required. Port conflicts fail the run; an unrelated or stale server is never reused.
+The root test command generates Wails bindings and builds the frontend in `e2e` mode before Playwright starts. This mode adds `e2e/components.html` for component accessibility tests; normal desktop builds exclude that fixture. Playwright compiles and starts the headless Go app on `127.0.0.1:9473`, waits for HTTP readiness, and shuts down its process tree afterward. No running development app is required. Port conflicts fail the run; an unrelated or stale server is never reused.
 
 ```sh
 pnpm test:e2e --project=webkit
@@ -26,7 +26,10 @@ Browser binaries are pinned by the Playwright version in the workspace lockfile.
 
 - Production bundle startup and reload without third-party HTTP dependencies.
 - Unhandled JavaScript exceptions, console errors, failed application requests, and HTTP asset errors fail the test.
-- Minimum desktop window size, horizontal overflow, and automated WCAG 2.1 A/AA accessibility checks.
+- Minimum desktop window size and reflow at 320 CSS pixels without horizontal overflow.
+- Automated axe WCAG A/AA checks through WCAG 2.2 against representative components in both brand palettes.
+- Keyboard operation for checkboxes, switches, selects, sliders, tabs, and accordions; dialog focus trapping, Escape, and focus restoration.
+- Visible keyboard focus and reduced-motion behavior.
 
 This suite covers the shared UI and Go asset-serving path. It does not validate native window behavior, macOS sandbox entitlements, Keychain, native audio devices, model inference, or cloud providers. The desktop build remains a separate CI check. Add native integration tests and real product journeys when those features exist; automated accessibility checks also do not replace keyboard and VoiceOver testing.
 

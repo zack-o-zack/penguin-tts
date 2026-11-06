@@ -64,3 +64,18 @@ test("remains accessible at the minimum desktop window size", async ({
   });
   expect(accessibility.violations).toEqual([]);
 });
+
+test("content reflows at a 320 CSS pixel viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      ),
+    )
+    .toBeLessThanOrEqual(0);
+});
