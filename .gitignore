@@ -1,4 +1,5 @@
 node_modules/
+.spikes/
 dist/
 coverage/
 playwright-report/
