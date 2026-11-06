@@ -1,0 +1,8 @@
+.spikes/
+node_modules/
+app/frontend/bindings/
+app/frontend/dist/
+pnpm-lock.yaml
+playwright-report/
+test-results/
+blob-report/

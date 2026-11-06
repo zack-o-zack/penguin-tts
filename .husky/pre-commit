@@ -1,0 +1,4 @@
+set -eu
+
+pnpm exec lint-staged
+pnpm slop:staged

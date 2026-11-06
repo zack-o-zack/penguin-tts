@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+app/bin/
+app/build/bin/
+app/frontend/bindings/
+.aislop/history.jsonl
+.aislop/agent/

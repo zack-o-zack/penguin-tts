@@ -1,0 +1,15 @@
+version: 1
+ci:
+  failBelow: 85
+telemetry:
+  enabled: false
+exclude:
+  - node_modules
+  - .git
+  - dist
+  - build
+  - coverage
+  - playwright-report
+  - test-results
+  - blob-report
+  - app/frontend/bindings

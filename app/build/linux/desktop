@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Penguin
+Comment=Local and BYOK text to speech
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/penguin %u
+Terminal=false
+Type=Application
+Icon=penguin
+Categories=Utility;
+StartupWMClass=penguin

@@ -1,0 +1,36 @@
+version: "3"
+
+tasks:
+  go:mod:tidy:
+    run: once
+    cmds:
+      - go mod tidy
+
+  build:frontend:
+    run: once
+    deps:
+      - task: generate:bindings
+    cmds:
+      - pnpm --filter @penguin/frontend build{{if eq .DEV "true"}}:dev{{end}}
+
+  generate:bindings:
+    run: once
+    deps:
+      - task: go:mod:tidy
+    cmds:
+      - go tool wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true -ts -i
+
+  generate:icons:
+    run: once
+    dir: build
+    sources:
+      - appicon.png
+    generates:
+      - darwin/icons.icns
+      - windows/icon.ico
+    cmds:
+      - go tool wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico
+
+  dev:frontend:
+    cmds:
+      - pnpm --filter @penguin/frontend dev --port {{.VITE_PORT}} --strictPort

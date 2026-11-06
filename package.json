@@ -1,0 +1,36 @@
+{
+  "name": "penguin",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=10 <11"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "dev": "pnpm --filter @penguin/app dev",
+    "dev:ui": "pnpm bindings && pnpm --filter @penguin/frontend dev",
+    "build": "pnpm --filter @penguin/app build",
+    "build:ui": "pnpm bindings && pnpm --filter @penguin/frontend build",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm slop",
+    "lint": "biome check . && prettier --check \"**/*.{md,yml,yaml}\" && pnpm --filter @penguin/app lint:go",
+    "format": "biome check --write . && prettier --write \"**/*.{md,yml,yaml}\" && pnpm --filter @penguin/app format:go",
+    "typecheck": "pnpm bindings && pnpm --filter @penguin/frontend typecheck",
+    "test": "pnpm --filter @penguin/app test",
+    "slop": "aislop ci --human",
+    "slop:staged": "aislop ci --staged --human",
+    "bindings": "pnpm --filter @penguin/app bindings",
+    "test:e2e": "pnpm build:ui && pnpm --filter @penguin/frontend test:e2e",
+    "test:e2e:install": "pnpm --filter @penguin/frontend exec playwright install chromium webkit",
+    "test:e2e:ui": "pnpm build:ui && pnpm --filter @penguin/frontend test:e2e:ui",
+    "test:e2e:report": "pnpm --filter @penguin/frontend test:e2e:report"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.6",
+    "aislop": "0.20.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.10"
+  }
+}

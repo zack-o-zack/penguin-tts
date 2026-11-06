@@ -1,0 +1,15 @@
+{
+  "name": "@penguin/app",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "go tool wails3 dev -config build/config.yml",
+    "build": "go tool wails3 build",
+    "package": "go tool wails3 task package",
+    "bindings": "go tool wails3 generate bindings -ts -i",
+    "lint:go": "node ../scripts/check-go-format.mjs",
+    "format:go": "gofmt -w .",
+    "test": "pnpm bindings && pnpm --filter @penguin/frontend build && go vet ./... && go test ./...",
+    "serve:e2e": "go run -tags server,production ."
+  }
+}

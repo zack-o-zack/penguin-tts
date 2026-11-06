@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MsixPackagingToolTemplate
+    xmlns="http://schemas.microsoft.com/msix/packaging/msixpackagingtool/template/2022">
+    <Settings
+        AllowTelemetry="false"
+        ApplyACLsToPackageFiles="true"
+        GenerateCommandLineFile="true"
+        AllowPromptForPassword="false">
+    </Settings>
+    <Installer
+        Path="penguin"
+        Arguments=""
+        InstallLocation="C:\Program Files\My Company\Penguin">
+    </Installer>
+    <PackageInformation
+        PackageName="Penguin"
+        PackageDisplayName="Penguin"
+        PublisherName="CN=My Company"
+        PublisherDisplayName="My Company"
+        Version="0.0.0.0"
+        PackageDescription="Local and BYOK text to speech">
+        <Capabilities>
+            <Capability Name="runFullTrust" />
+
+        </Capabilities>
+        <Applications>
+            <Application
+                Id="app.penguin.tts"
+                Description="Local and BYOK text to speech"
+                DisplayName="Penguin"
+                ExecutableName="penguin"
+                EntryPoint="Windows.FullTrustApplication">
+
+            </Application>
+        </Applications>
+        <Resources>
+            <Resource Language="en-us" />
+        </Resources>
+        <Dependencies>
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        </Dependencies>
+        <Properties>
+            <Framework>false</Framework>
+            <DisplayName>Penguin</DisplayName>
+            <PublisherDisplayName>My Company</PublisherDisplayName>
+            <Description>Local and BYOK text to speech</Description>
+            <Logo>Assets\AppIcon.png</Logo>
+        </Properties>
+    </PackageInformation>
+    <SaveLocation PackagePath="penguin.msix" />
+    <PackageIntegrity>
+        <CertificatePath></CertificatePath>
+    </PackageIntegrity>
+</MsixPackagingToolTemplate>

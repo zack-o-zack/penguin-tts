@@ -1,0 +1,31 @@
+version: "3"
+
+info:
+  companyName: Penguin contributors
+  productName: Penguin
+  productIdentifier: app.penguin.tts
+  description: Local and BYOK text to speech
+  copyright: Penguin contributors
+  version: 0.0.0
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 500
+  ignore:
+    dir: [.git, node_modules, frontend, bin, build]
+    file: [.DS_Store, .gitignore, "*_test.go"]
+    watched_extension: ["*.go"]
+    git_ignore: true
+  executes:
+    - cmd: go tool wails3 build DEV=true
+      type: blocking
+    - cmd: go tool wails3 task common:dev:frontend
+      type: background
+      readiness:
+        http: http://127.0.0.1:9245/
+        timeout: 60s
+        interval: 200ms
+    - cmd: go tool wails3 task run
+      type: primary
+      exit_policy: shutdown

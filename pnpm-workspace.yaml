@@ -1,0 +1,6 @@
+packages:
+  - app
+  - app/frontend
+
+onlyBuiltDependencies:
+  - esbuild
