@@ -60,7 +60,7 @@ export function AppearanceControls() {
     );
     document.documentElement.style.setProperty(
       "--surface-opacity",
-      String(1 - appearance.transparency / 100),
+      `${100 - appearance.transparency}%`,
     );
     try {
       localStorage.setItem(storageKey, JSON.stringify(appearance));
@@ -76,7 +76,7 @@ export function AppearanceControls() {
           variant="ghost"
           size="icon"
           type="button"
-          className="appearance-trigger text-muted-foreground"
+          className="ml-auto size-9 text-muted-foreground"
           aria-label="Appearance"
           title="Appearance"
         >
@@ -86,10 +86,12 @@ export function AppearanceControls() {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="appearance-panel"
+        className="space-y-3 p-4"
         aria-labelledby="appearance-title"
       >
-        <h2 id="appearance-title">Appearance</h2>
+        <h2 id="appearance-title" className="font-semibold">
+          Appearance
+        </h2>
         <Label htmlFor="theme">Theme</Label>
         <Select
           value={appearance.theme}
@@ -108,9 +110,11 @@ export function AppearanceControls() {
             <SelectItem value="light">Light</SelectItem>
           </SelectContent>
         </Select>
-        <div className="transparency-label">
+        <div className="flex items-center justify-between gap-2">
           <Label id="transparency-label">Transparency</Label>
-          <output htmlFor="transparency">{appearance.transparency}%</output>
+          <output htmlFor="transparency" className="text-sm tabular-nums">
+            {appearance.transparency}%
+          </output>
         </div>
         <Slider
           id="transparency"
@@ -127,7 +131,7 @@ export function AppearanceControls() {
           }}
         />
         <div
-          className="transparency-label transparency-hints"
+          className="flex items-center justify-between gap-2 text-xs text-muted-foreground"
           aria-hidden="true"
         >
           <span>Solid</span>

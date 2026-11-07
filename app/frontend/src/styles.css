@@ -1,12 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "./workspace.css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --surface-opacity: 0.88;
+  --surface-opacity: 88%;
   --background: #f5f8f6;
   --foreground: #14261b;
   --card: #ffffff;
@@ -141,7 +140,18 @@
     min-width: 320px;
   }
 
-  :focus-visible:not(#speech-text) {
+  html:has([data-desktop-shell]),
+  body:has([data-desktop-shell]) {
+    background: transparent;
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    [data-desktop-shell] {
+      --surface-opacity: 100%;
+    }
+  }
+
+  :focus-visible:not([data-slot="input-group-control"]) {
     /* biome-ignore lint/complexity/noImportantStyles: Keep keyboard focus visible over component outline utilities. */
     outline: 2px solid var(--ring) !important;
     /* biome-ignore lint/complexity/noImportantStyles: Keep the focus outline clear of component borders. */

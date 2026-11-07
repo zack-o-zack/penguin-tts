@@ -68,7 +68,9 @@ test("remains accessible at the minimum desktop window size", async ({
 test("content reflows at a 320 CSS pixel viewport", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/");
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(
+    page.getByRole("button", { name: "Expand sidebar" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(
     page.getByRole("textbox", { name: "Text to speak" }),
@@ -87,7 +89,7 @@ test("content reflows at a 320 CSS pixel viewport", async ({ page }) => {
 test("sidebar toggles by keyboard without losing the speech draft", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 720, height: 540 });
+  await page.setViewportSize({ width: 900, height: 600 });
   await page.goto("/");
   const input = page.getByRole("textbox", { name: "Text to speak" });
   const expandedInputWidth = await input.evaluate(
@@ -119,6 +121,27 @@ test("sidebar toggles by keyboard without losing the speech draft", async ({
   await expect(
     page.getByRole("button", { name: "Generate speech (coming soon)" }),
   ).toBeDisabled();
+});
+
+test("mobile sidebar opens as a sheet and returns focus without losing the draft", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 760 });
+  await page.goto("/");
+  const input = page.getByRole("textbox", { name: "Text to speak" });
+  await input.fill("Keep these words while I open the sidebar.");
+  const trigger = page.getByRole("button", { name: "Expand sidebar" });
+  await trigger.click();
+  const sidebar = page.getByRole("dialog", { name: "Sidebar", exact: true });
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar).toBeFocused();
+  await expect(
+    sidebar.getByRole("link", { name: "Text to speech" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sidebar).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(input).toHaveValue("Keep these words while I open the sidebar.");
 });
 
 for (const theme of ["dark", "light"]) {
