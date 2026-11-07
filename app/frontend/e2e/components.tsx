@@ -160,11 +160,6 @@ function ComponentFixture() {
   );
 }
 
-document.documentElement.classList.toggle(
-  "dark",
-  new URLSearchParams(window.location.search).get("theme") !== "light",
-);
-
 const root = document.getElementById("root");
 if (!root) throw new Error("The component fixture root is missing.");
 createRoot(root).render(<ComponentFixture />);

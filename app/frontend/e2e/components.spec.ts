@@ -57,6 +57,7 @@ test("keyboard users can operate controls and return from a dialog", async ({
   ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(provider).toHaveText("Cloud");
+  await expect(provider).toBeFocused();
   const accordion = page.getByRole("button", {
     name: "Where is my data stored?",
   });

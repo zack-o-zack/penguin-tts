@@ -2,6 +2,12 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      document.documentElement.classList.toggle(
+        "dark",
+        new URLSearchParams(window.location.search).get("theme") !== "light",
+      );
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Penguin component accessibility fixture</title>
   </head>

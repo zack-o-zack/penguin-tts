@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Penguin</title>
+  <desc id="description">An upright penguin in profile, with a curved back, an angular breast, and a single wing cut.</desc>
+  <path fill="#19231f" fill-rule="evenodd" d="M 140 27 C 159 27 174 39 179 58 L 214 72 L 177 86 L 155 110 L 185 201 C 170 221 151 231 128 231 C 91 231 65 209 65 178 C 64 147 78 122 92 98 C 103 79 100 57 111 42 C 118 31 128 27 140 27 Z M 112 124 C 104 156 116 189 146 211 L 112 124 Z"/>
+</svg>

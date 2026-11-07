@@ -5,6 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --surface-opacity: 88%;
   --background: #f5f8f6;
   --foreground: #14261b;
   --card: #ffffff;
@@ -139,7 +140,18 @@
     min-width: 320px;
   }
 
-  :focus-visible {
+  html:has([data-desktop-shell]),
+  body:has([data-desktop-shell]) {
+    background: transparent;
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    [data-desktop-shell] {
+      --surface-opacity: 100%;
+    }
+  }
+
+  :focus-visible:not([data-slot="input-group-control"]) {
     /* biome-ignore lint/complexity/noImportantStyles: Keep keyboard focus visible over component outline utilities. */
     outline: 2px solid var(--ring) !important;
     /* biome-ignore lint/complexity/noImportantStyles: Keep the focus outline clear of component borders. */
@@ -174,68 +186,5 @@
       /* biome-ignore lint/complexity/noImportantStyles: Respect reduced motion over component animation utilities. */
       scroll-behavior: auto !important;
     }
-  }
-}
-
-@layer components {
-  .workspace {
-    display: flex;
-    flex-direction: column;
-    min-height: 100svh;
-    padding: clamp(24px, 5vw, 64px);
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 18px;
-    font-weight: 600;
-  }
-
-  .brand-mark {
-    display: grid;
-    width: 36px;
-    height: 36px;
-    place-items: center;
-    border-radius: 12px;
-    background: var(--primary);
-    color: var(--primary-foreground);
-  }
-
-  .welcome {
-    max-width: 680px;
-    margin-block: auto;
-    padding-block: 64px;
-  }
-
-  .eyebrow {
-    color: var(--primary);
-    font-size: 14px;
-  }
-
-  .welcome h1 {
-    margin: 16px 0 24px;
-    font-size: clamp(36px, 5vw, 60px);
-    line-height: 1.1;
-    letter-spacing: -0.04em;
-  }
-
-  .description {
-    max-width: 520px;
-    color: var(--muted-foreground);
-    font-size: 19px;
-    line-height: 1.6;
-  }
-
-  .status,
-  .workspace footer {
-    color: var(--muted-foreground);
-    font-size: 13px;
-    line-height: 1.6;
-  }
-
-  .status {
-    margin-top: 32px;
   }
 }
