@@ -1,78 +1,241 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #edf1f5;
-  background: #111419;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+  --background: #f5f8f6;
+  --foreground: #14261b;
+  --card: #ffffff;
+  --card-foreground: #14261b;
+  --popover: #ffffff;
+  --popover-foreground: #14261b;
+  --primary: #246044;
+  --primary-foreground: #ffffff;
+  --secondary: #e1ece5;
+  --secondary-foreground: #14261b;
+  --muted: #e1ece5;
+  --muted-foreground: #506259;
+  --accent: #d0e8d9;
+  --accent-foreground: #14261b;
+  --destructive: #a91d37;
+  --border: #7c8e83;
+  --input: #7c8e83;
+  --ring: #246044;
+  --chart-1: #246044;
+  --chart-2: #236b8e;
+  --chart-3: #875124;
+  --chart-4: #794c91;
+  --chart-5: #a91d37;
+  --radius: 0.625rem;
+  --sidebar: #e1ece5;
+  --sidebar-foreground: #14261b;
+  --sidebar-primary: #246044;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d0e8d9;
+  --sidebar-accent-foreground: #14261b;
+  --sidebar-border: #7c8e83;
+  --sidebar-ring: #246044;
 }
 
-* {
-  box-sizing: border-box;
+.dark {
+  --background: #111419;
+  --foreground: #edf1f5;
+  --card: #1b222a;
+  --card-foreground: #edf1f5;
+  --popover: #1b222a;
+  --popover-foreground: #edf1f5;
+  --primary: #b4e4c5;
+  --primary-foreground: #14261b;
+  --secondary: #283a30;
+  --secondary-foreground: #edf1f5;
+  --muted: #242d37;
+  --muted-foreground: #aeb7c2;
+  --accent: #283a30;
+  --accent-foreground: #d4f0de;
+  --destructive: #ff9b9b;
+  --border: #718096;
+  --input: #718096;
+  --ring: #b4e4c5;
+  --chart-1: #b4e4c5;
+  --chart-2: #83c6ea;
+  --chart-3: #eac080;
+  --chart-4: #c4a1e5;
+  --chart-5: #ff9b9b;
+  --sidebar: #1b222a;
+  --sidebar-foreground: #edf1f5;
+  --sidebar-primary: #b4e4c5;
+  --sidebar-primary-foreground: #14261b;
+  --sidebar-accent: #283a30;
+  --sidebar-accent-foreground: #d4f0de;
+  --sidebar-border: #718096;
+  --sidebar-ring: #b4e4c5;
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-.workspace {
-  display: flex;
-  flex-direction: column;
-  min-height: 100svh;
-  padding: clamp(24px, 5vw, 64px);
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply font-sans;
+    color-scheme: light;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    min-width: 320px;
+  }
+
+  :focus-visible {
+    /* biome-ignore lint/complexity/noImportantStyles: Keep keyboard focus visible over component outline utilities. */
+    outline: 2px solid var(--ring) !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Keep the focus outline clear of component borders. */
+    outline-offset: 2px !important;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-slot="drawer-content"] {
+    overscroll-behavior: contain;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      /* biome-ignore lint/complexity/noImportantStyles: Respect reduced motion over component animation utilities. */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: Respect reduced motion over component animation utilities. */
+      animation-iteration-count: 1 !important;
+      /* biome-ignore lint/complexity/noImportantStyles: Respect reduced motion over component animation utilities. */
+      transition-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: Respect reduced motion over component animation utilities. */
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 18px;
-  font-weight: 600;
-}
+@layer components {
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+    padding: clamp(24px, 5vw, 64px);
+  }
 
-.brand-mark {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 12px;
-  background: #b4e4c5;
-  color: #14261b;
-}
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: 600;
+  }
 
-.welcome {
-  max-width: 680px;
-  margin-block: auto;
-  padding-block: 64px;
-}
+  .brand-mark {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
 
-.eyebrow {
-  color: #b4e4c5;
-  font-size: 14px;
-}
+  .welcome {
+    max-width: 680px;
+    margin-block: auto;
+    padding-block: 64px;
+  }
 
-h1 {
-  margin: 16px 0 24px;
-  font-size: clamp(36px, 5vw, 60px);
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-}
+  .eyebrow {
+    color: var(--primary);
+    font-size: 14px;
+  }
 
-.description {
-  max-width: 520px;
-  color: #aeb7c2;
-  font-size: 19px;
-  line-height: 1.6;
-}
+  .welcome h1 {
+    margin: 16px 0 24px;
+    font-size: clamp(36px, 5vw, 60px);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
 
-.status,
-footer {
-  color: #aeb7c2;
-  font-size: 13px;
-  line-height: 1.6;
-}
+  .description {
+    max-width: 520px;
+    color: var(--muted-foreground);
+    font-size: 19px;
+    line-height: 1.6;
+  }
 
-.status {
-  margin-top: 32px;
+  .status,
+  .workspace footer {
+    color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .status {
+    margin-top: 32px;
+  }
 }

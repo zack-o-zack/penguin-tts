@@ -4,3 +4,7 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+
+# shadcn CLI tooling uses the compatible patched minimatch API.
+overrides:
+  "@ts-morph/common>minimatch": 11.0.1

@@ -21,9 +21,9 @@
     "slop": "aislop ci --human",
     "slop:staged": "aislop ci --staged --human",
     "bindings": "pnpm --filter @penguin/app bindings",
-    "test:e2e": "pnpm build:ui && pnpm --filter @penguin/frontend test:e2e",
+    "test:e2e": "pnpm bindings && pnpm --filter @penguin/frontend build --mode e2e && pnpm --filter @penguin/frontend test:e2e",
     "test:e2e:install": "pnpm --filter @penguin/frontend exec playwright install chromium webkit",
-    "test:e2e:ui": "pnpm build:ui && pnpm --filter @penguin/frontend test:e2e:ui",
+    "test:e2e:ui": "pnpm bindings && pnpm --filter @penguin/frontend build --mode e2e && pnpm --filter @penguin/frontend test:e2e:ui",
     "test:e2e:report": "pnpm --filter @penguin/frontend test:e2e:report"
   },
   "devDependencies": {

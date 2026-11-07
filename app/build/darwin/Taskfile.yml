@@ -54,9 +54,9 @@ tasks:
       GOOS: darwin
       CGO_ENABLED: '{{if (has "purego" (splitList "," (.EXTRA_TAGS | default "")))}}0{{else}}1{{end}}'
       GOARCH: "{{.ARCH | default ARCH}}"
-      CGO_CFLAGS: "-mmacosx-version-min=13.0"
-      CGO_LDFLAGS: "-mmacosx-version-min=13.0"
-      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      CGO_CFLAGS: "-mmacosx-version-min=13.3"
+      CGO_LDFLAGS: "-mmacosx-version-min=13.3"
+      MACOSX_DEPLOYMENT_TARGET: "13.3"
 
   build:docker:
     summary: Cross-compiles for macOS using Docker (for Linux/Windows hosts)
