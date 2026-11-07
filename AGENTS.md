@@ -6,3 +6,5 @@
 - Run `pnpm check` and `pnpm build` for changes to the desktop shell or build tooling. Run narrower checks when a change only affects documentation.
 - Do not commit generated bindings, frontend assets, binaries, dependency directories, API keys, or `.env` files.
 - Keep product requirements and research in `.spikes/`.
+
+- After opening a pull request, explain the changes to the user, why they matter, and how they were validated.
