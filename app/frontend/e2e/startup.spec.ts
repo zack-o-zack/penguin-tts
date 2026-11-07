@@ -180,9 +180,21 @@ for (const theme of ["dark", "light"]) {
         return getComputedStyle(element.parentElement).backgroundColor;
       });
     const solidColor = await surfaceColor();
+    const reducedTransparency = await page.evaluate(
+      () => matchMedia("(prefers-reduced-transparency: reduce)").matches,
+    );
     await page.keyboard.press("End");
     await expect(transparency).toHaveAttribute("aria-valuenow", "20");
-    await expect.poll(surfaceColor).not.toEqual(solidColor);
+    // The system accessibility preference takes priority over the slider.
+    await expect(page.locator("[data-desktop-shell]")).toHaveCSS(
+      "--surface-opacity",
+      reducedTransparency ? "100%" : "80%",
+    );
+    if (reducedTransparency) {
+      await expect.poll(surfaceColor).toEqual(solidColor);
+    } else {
+      await expect.poll(surfaceColor).not.toEqual(solidColor);
+    }
     await page.keyboard.press("Escape");
     await expect(appearance).toBeFocused();
 
@@ -218,6 +230,49 @@ for (const theme of ["dark", "light"]) {
     ).toBeVisible();
   });
 }
+
+test("reduced transparency overrides the surface without losing the saved preference", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(
+    browserName !== "chromium",
+    "Media emulation requires Chromium CDP.",
+  );
+  const session = await page.context().newCDPSession(page);
+  const emulateTransparency = (value: "reduce" | "no-preference") =>
+    session.send("Emulation.setEmulatedMedia", {
+      features: [
+        { name: "prefers-reduced-transparency", value },
+        { name: "prefers-reduced-motion", value: "reduce" },
+      ],
+    });
+  await emulateTransparency("reduce");
+  await page.goto("/");
+  const shell = page.locator("[data-desktop-shell]");
+  await expect(shell).toHaveCSS("--surface-opacity", "100%");
+  const appearance = page.getByRole("button", {
+    name: "Appearance",
+    exact: true,
+  });
+  await appearance.click();
+  const transparency = page.getByRole("slider", {
+    name: "Transparency",
+    exact: true,
+  });
+  await transparency.focus();
+  await page.keyboard.press("End");
+  await expect(transparency).toHaveAttribute("aria-valuenow", "20");
+  await expect(shell).toHaveCSS("--surface-opacity", "100%");
+  await page.reload();
+  await appearance.click();
+  await expect(transparency).toHaveAttribute("aria-valuenow", "20");
+  await expect(shell).toHaveCSS("--surface-opacity", "100%");
+  await emulateTransparency("no-preference");
+  await expect(shell).toHaveCSS("--surface-opacity", "80%");
+  await emulateTransparency("reduce");
+  await expect(shell).toHaveCSS("--surface-opacity", "100%");
+});
 
 test("header starts native window dragging while controls stay clickable", async ({
   page,
