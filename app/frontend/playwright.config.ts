@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { e2eRoot } from "./e2e/paths";
 
 const isCI = Boolean(process.env.CI);
 const baseURL = "http://127.0.0.1:9473";
@@ -44,6 +45,7 @@ export default defineConfig({
       CGO_ENABLED: "0",
       WAILS_SERVER_HOST: "127.0.0.1",
       WAILS_SERVER_PORT: "9473",
+      PENGUIN_E2E_ROOT: e2eRoot,
     },
   },
 });

@@ -28,6 +28,10 @@ Browser binaries are pinned by the Playwright version in the workspace lockfile.
 - Unhandled JavaScript exceptions, console errors, failed application requests, and HTTP asset errors fail the test.
 - Minimum desktop window size, horizontal overflow, and automated WCAG 2.1 A/AA accessibility checks.
 
+- Model catalog, download, pause and resume, retry, cancel, folder import, relocation, removal and reload journeys against the real Go service.
+
+The E2E build (`e2e` tag) swaps in a synthetic catalog, a throwaway data root under the system temporary directory and a local TLS origin. Server mode has no native dialogs, so the folder picker returns a fixture folder. These journeys do not prove native dialogs, sleep/wake or window-close behavior.
+
 This suite covers the shared UI and Go asset-serving path. It does not validate native window behavior, macOS sandbox entitlements, Keychain, native audio devices, model inference, or cloud providers. The desktop build remains a separate CI check. Add native integration tests and real product journeys when those features exist; automated accessibility checks also do not replace keyboard and VoiceOver testing.
 
 ## Test conventions

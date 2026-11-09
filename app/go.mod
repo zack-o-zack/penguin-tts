@@ -2,7 +2,10 @@ module penguin.local/app
 
 go 1.27.3
 
-require github.com/wailsapp/wails/v3 v3.1.0
+require (
+	github.com/wailsapp/wails/v3 v3.1.0
+	golang.org/x/sys v0.48.0
+)
 
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
@@ -131,7 +134,6 @@ require (
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect

@@ -1,8 +1,14 @@
-import { ArrowUpIcon, AudioLinesIcon } from "lucide-react";
-import { type CSSProperties, useRef } from "react";
+import {
+  ArrowUpIcon,
+  AudioLinesIcon,
+  BoxIcon,
+  type LucideIcon,
+} from "lucide-react";
+import { type CSSProperties, useRef, useSyncExternalStore } from "react";
 import mark from "@/assets/brand/penguin-mark.svg";
 import inverseMark from "@/assets/brand/penguin-mark-inverse.svg";
 import { AppearanceControls } from "@/components/appearance-controls";
+import { ModelsDialog, ModelsPage } from "@/components/models-page";
 import {
   InputGroup,
   InputGroupAddon,
@@ -79,7 +85,40 @@ function SpeechInput() {
   );
 }
 
+function subscribeToHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
+function ViewLink({
+  href,
+  active,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active} size="lg">
+        <a href={href} aria-current={active ? "page" : undefined}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </a>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function currentView() {
+  return window.location.hash === "#models" ? "models" : "speech";
+}
+
 function Workspace() {
+  const view = useSyncExternalStore(subscribeToHash, currentView);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { open, openMobile, isMobile } = useSidebar();
   const expanded = isMobile ? openMobile : open;
@@ -124,6 +163,12 @@ function Workspace() {
           event.preventDefault();
           triggerRef.current?.focus();
         }}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          if (event.currentTarget instanceof HTMLElement) {
+            event.currentTarget.focus();
+          }
+        }}
         role="complementary"
         aria-label="Sidebar"
         aria-hidden={!expanded}
@@ -133,27 +178,40 @@ function Workspace() {
         <SidebarContent id="app-sidebar" className="p-4 pt-5">
           <nav aria-label="Workspace">
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive size="lg">
-                  <a href="#speech" aria-current="page">
-                    <AudioLinesIcon aria-hidden="true" />
-                    <span>Text to speech</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <ViewLink
+                href="#speech"
+                active={view === "speech"}
+                icon={AudioLinesIcon}
+                label="Text to speech"
+              />
+              <ViewLink
+                href="#models"
+                active={view === "models"}
+                icon={BoxIcon}
+                label="Models"
+              />
             </SidebarMenu>
           </nav>
         </SidebarContent>
-        <SidebarFooter className="px-6 pb-5 text-xs leading-relaxed text-muted-foreground">
-          <p>Local first. Open source.</p>
+        <SidebarFooter className="items-start px-4 pb-4">
+          <ModelsDialog />
         </SidebarFooter>
       </Sidebar>
       <main
         id="speech"
+        hidden={view !== "speech"}
         className="flex min-w-0 flex-1 items-center justify-center px-4 pt-[calc(var(--header-height)+3rem)] pb-12 sm:px-6 lg:px-16"
       >
         <SpeechInput />
       </main>
+      {view === "models" && (
+        <main
+          id="models"
+          className="mt-(--header-height) h-[calc(100svh-var(--header-height))] min-w-0 flex-1 overflow-y-auto px-4 pt-6 pb-12 sm:px-6 lg:px-16"
+        >
+          <ModelsPage />
+        </main>
+      )}
     </>
   );
 }
