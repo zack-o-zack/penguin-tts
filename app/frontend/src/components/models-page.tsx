@@ -4,7 +4,7 @@ import {
   EllipsisIcon,
   FolderOpenIcon,
 } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { Children, type ReactNode, useId, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -40,6 +40,7 @@ import {
   ItemContent,
   ItemDescription,
   ItemGroup,
+  ItemSeparator,
   ItemTitle,
 } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
@@ -161,7 +162,7 @@ function ConfirmDialog({
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -222,10 +223,12 @@ function JobRow({ job, run }: { job: JobSnapshot; run: Run }) {
   const failedWithoutFiles = job.state === "failed" && job.retainedBytes === 0;
   const cancel = () => void run(() => Service.Cancel(job.jobId));
   return (
-    <Item variant="outline" role="group" aria-labelledby={nameId}>
+    <Item role="group" aria-labelledby={nameId}>
       <ItemContent>
-        <ItemTitle id={nameId}>{job.displayName}</ItemTitle>
-        <ItemDescription className="tabular-nums">
+        <ItemTitle id={nameId} className="text-[13px]">
+          {job.displayName}
+        </ItemTitle>
+        <ItemDescription className="text-[11px] tabular-nums">
           <span>{jobStateLabel(job.state)}</span> · {jobDetail(job, percent)}
         </ItemDescription>
       </ItemContent>
@@ -233,7 +236,7 @@ function JobRow({ job, run }: { job: JobSnapshot; run: Run }) {
         {actions.includes("pause") && (
           <Button
             size="sm"
-            variant="outline"
+            variant="secondary"
             onClick={() => void run(() => Service.Pause(job.jobId))}
           >
             Pause
@@ -242,6 +245,7 @@ function JobRow({ job, run }: { job: JobSnapshot; run: Run }) {
         {actions.includes("resume") && (
           <Button
             size="sm"
+            variant="secondary"
             onClick={() => void run(() => Service.Resume(job.jobId))}
           >
             {job.state === "failed" ? "Retry" : "Resume"}
@@ -284,8 +288,12 @@ function DetailList({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-xs font-medium">{title}</h3>
-      <ItemGroup className="gap-1">{children}</ItemGroup>
+      <h3 className="text-[11px] font-semibold text-muted-foreground">
+        {title}
+      </h3>
+      <ItemGroup className="gap-0 has-data-[size=xs]:gap-0">
+        {children}
+      </ItemGroup>
     </div>
   );
 }
@@ -302,10 +310,12 @@ function BundleRow({
   const nameId = useId();
   const [showDetails, setShowDetails] = useState(false);
   return (
-    <Item variant="outline" role="group" aria-labelledby={nameId}>
+    <Item role="group" aria-labelledby={nameId}>
       <ItemContent>
-        <ItemTitle id={nameId}>{entry.displayName}</ItemTitle>
-        <ItemDescription>
+        <ItemTitle id={nameId} className="text-[13px]">
+          {entry.displayName}
+        </ItemTitle>
+        <ItemDescription className="text-[11px]">
           {[
             entry.downloadEligible
               ? formatBytes(entry.requiredBytes)
@@ -319,6 +329,7 @@ function BundleRow({
       <ItemActions>
         <Button
           size="sm"
+          variant="secondary"
           disabled={!entry.downloadEligible}
           onClick={() =>
             void run(() => Service.EnqueueDownload(entry.bundleId))
@@ -352,7 +363,7 @@ function BundleRow({
         className="basis-full data-[state=closed]:hidden"
       >
         <CollapsibleContent className="flex flex-col gap-3 pt-2">
-          <ItemDescription>
+          <ItemDescription className="text-[11px]">
             {entry.publisher} · {entry.releaseLabel}. {entry.description}
           </ItemDescription>
           <div className="flex flex-wrap gap-1.5">
@@ -367,7 +378,7 @@ function BundleRow({
           </div>
           <DetailList title="Required files">
             {(entry.artifacts ?? []).map((artifact) => (
-              <Item key={artifact.path} size="xs" variant="muted">
+              <Item key={artifact.path} size="xs" className="px-0 py-1">
                 <ItemContent>
                   <ItemTitle className="font-mono text-xs break-all">
                     {artifact.path}
@@ -381,7 +392,7 @@ function BundleRow({
           </DetailList>
           <DetailList title="Licenses and attribution">
             {(entry.licenses ?? []).map((license) => (
-              <Item key={license.subject} size="xs" variant="muted">
+              <Item key={license.subject} size="xs" className="px-0 py-1">
                 <ItemContent>
                   <ItemTitle className="text-xs">
                     {license.licenseId || "License unresolved"}
@@ -419,13 +430,20 @@ function InstallationRow({
   const verified = install.status === "verified_files";
   const removeLabel = external ? "Remove from Penguin" : "Delete files";
   return (
-    <Item variant="outline" role="group" aria-labelledby={nameId}>
+    <Item role="group" aria-labelledby={nameId}>
       <ItemContent>
-        <ItemTitle id={nameId}>{install.displayName}</ItemTitle>
-        <ItemDescription>{formatBytes(install.sizeBytes)}</ItemDescription>
+        <ItemTitle id={nameId} className="text-[13px]">
+          {install.displayName}
+        </ItemTitle>
+        <ItemDescription className="text-[11px] tabular-nums">
+          {formatBytes(install.sizeBytes)}
+        </ItemDescription>
       </ItemContent>
       <ItemActions>
-        <Badge variant={verified ? "secondary" : "destructive"}>
+        <Badge
+          variant={verified ? "ghost" : "destructive"}
+          className={verified ? "px-0 text-muted-foreground" : undefined}
+        >
           {statusLabels[install.status] ?? install.status}
         </Badge>
         <MoreMenu name={install.displayName}>
@@ -496,11 +514,20 @@ function InstallationRow({
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-2">
-      <h2 id={id} className="text-sm font-medium">
+    <section aria-labelledby={id} className="flex flex-col gap-1.5">
+      <h2 id={id} className="px-3 text-[13px] font-semibold">
         {title}
       </h2>
-      <ItemGroup className="gap-2">{children}</ItemGroup>
+      <ItemGroup className="gap-0 rounded-[10px] bg-foreground/[0.04] ring-1 ring-foreground/10 has-data-[size=sm]:gap-0 has-data-[size=xs]:gap-0">
+        {Children.map(children, (row, index) => (
+          <>
+            {index > 0 && (
+              <ItemSeparator className="mx-3 my-0 bg-foreground/10 data-horizontal:w-auto" />
+            )}
+            {row}
+          </>
+        ))}
+      </ItemGroup>
     </section>
   );
 }
@@ -524,7 +551,7 @@ function ModelLibrary() {
       ),
   );
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
@@ -541,29 +568,6 @@ function ModelLibrary() {
         </Alert>
       )}
       {!loaded && <Spinner className="size-5 text-muted-foreground" />}
-      {installations && (installs.length > 0 || jobs.length > 0) && (
-        <Item variant="muted" size="xs" role="group" aria-label="Storage">
-          <ItemContent>
-            <ItemDescription className="tabular-nums">
-              {formatBytes(
-                installations.managedBytes + installations.retainedBytes,
-              )}{" "}
-              used
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Open models folder"
-              title="Open models folder"
-              onClick={() => void run(() => Service.RevealModelsFolder())}
-            >
-              <FolderOpenIcon aria-hidden="true" />
-            </Button>
-          </ItemActions>
-        </Item>
-      )}
       {jobs.length > 0 && (
         <Section title="In progress">
           {jobs.map((job) => (
@@ -595,16 +599,41 @@ function ModelLibrary() {
           ))}
         </Section>
       )}
+      {installations && (installs.length > 0 || jobs.length > 0) && (
+        <Item size="xs" role="group" aria-label="Storage" className="px-3 py-0">
+          <ItemContent>
+            <ItemDescription className="text-[11px] tabular-nums">
+              {formatBytes(
+                installations.managedBytes + installations.retainedBytes,
+              )}{" "}
+              used
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Open models folder"
+              title="Open models folder"
+              onClick={() => void run(() => Service.RevealModelsFolder())}
+            >
+              <FolderOpenIcon aria-hidden="true" />
+            </Button>
+          </ItemActions>
+        </Item>
+      )}
     </div>
   );
 }
 
 export function ModelsPage() {
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-medium tracking-tight">Models</h1>
-        <p className="text-sm text-muted-foreground">{libraryDescription}</p>
+        <h1 className="text-[22px] font-semibold tracking-tight">Models</h1>
+        <p className="text-[13px] text-muted-foreground">
+          {libraryDescription}
+        </p>
       </header>
       <ModelLibrary />
     </div>
@@ -626,13 +655,17 @@ export function ModelsDialog() {
           <DownloadIcon aria-hidden="true" className="size-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[81svh] flex-col gap-0 overflow-hidden rounded-2xl border p-0 sm:max-w-[min(936px,calc(100%-4rem))] max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[calc(100svh-3rem)] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0">
-        <DialogHeader className="p-6 pb-3">
-          <DialogTitle className="text-xl font-semibold">Models</DialogTitle>
-          <DialogDescription>{libraryDescription}</DialogDescription>
+      <DialogContent className="flex max-h-[81svh] flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-2xl sm:max-w-[min(936px,calc(100%-4rem))] [&>[data-slot=dialog-close]]:right-auto [&>[data-slot=dialog-close]]:left-2 max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[calc(100svh-3rem)] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none">
+        <DialogHeader className="h-11 shrink-0 justify-center border-b border-foreground/10 px-12 text-center">
+          <DialogTitle className="text-[13px] font-semibold">
+            Models
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            {libraryDescription}
+          </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex min-h-0 flex-col overflow-hidden [&_[data-slot=scroll-area-viewport]]:min-h-0 [&_[data-slot=scroll-area-viewport]]:flex-1 [&_[data-slot=scroll-area-viewport]>div]:block!">
-          <div className="p-6 pt-1">
+          <div className="p-5">
             <ModelLibrary />
           </div>
         </ScrollArea>
