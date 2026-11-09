@@ -74,7 +74,6 @@ type Manager struct {
 	store   *store
 	catalog *catalog.Catalog
 	tr      *transferer
-	hooks   fsHooks
 	free    func(string) (uint64, error)
 	hashing func(string)
 	waitFor time.Duration
@@ -113,7 +112,6 @@ func open(ctx context.Context, options Options, controls testControls) (*Manager
 		options: options,
 		store:   opened,
 		catalog: options.Catalog,
-		hooks:   hooks,
 		free:    freeBytes,
 		hashing: func(string) {},
 		waitFor: shutdownWait,
@@ -459,10 +457,8 @@ func (m *Manager) Cancel(jobID string) error {
 // discardLocked runs only once writers have stopped, and removes nothing but
 // the job's own staging and journal.
 func (m *Manager) discardLocked(j *job) error {
-	if j.StagingID != "" {
-		if err := m.store.root.RemoveAll(stagingDir(j.StagingID)); err != nil {
-			return storageError(CodeWriteFailed, "", err)
-		}
+	if err := m.store.discardStaging(j.StagingID); err != nil {
+		return storageError(CodeWriteFailed, "", err)
 	}
 	if err := m.store.removeJournal(j.JobID); err != nil {
 		return storageError(CodeWriteFailed, "", err)
@@ -548,22 +544,8 @@ func (m *Manager) finish(j *job, err error) {
 	})
 }
 
-// stagedSizesLocked reports each regular file in the job's staging by artifact path.
-func (m *Manager) stagedSizesLocked(j *job) map[string]int64 {
-	sizes := map[string]int64{}
-	if j.StagingID == "" {
-		return sizes
-	}
-	for _, artifact := range j.Artifacts {
-		if info, err := m.store.root.Lstat(stagingFile(j.StagingID, artifact.Path)); err == nil && info.Mode().IsRegular() {
-			sizes[artifact.Path] = info.Size()
-		}
-	}
-	return sizes
-}
-
 func (m *Manager) stagedBytesLocked(j *job) int64 {
-	return sumSizes(m.stagedSizesLocked(j))
+	return sumSizes(m.store.stagedSizes(j.StagingID, j.Artifacts))
 }
 
 func sumSizes(sizes map[string]int64) (total int64) {

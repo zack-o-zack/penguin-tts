@@ -180,7 +180,7 @@ func (t *transferer) attempt(ctx context.Context, spec transferSpec) (err error)
 		if closed {
 			return
 		}
-		if closeErr := t.store.hooks.close(file); closeErr != nil && err == nil {
+		if closeErr := t.store.closeFile(file); closeErr != nil && err == nil {
 			err = storageFailure(name, closeErr)
 		}
 	}()
@@ -238,7 +238,7 @@ func (t *transferer) attempt(ctx context.Context, spec transferSpec) (err error)
 		return err
 	}
 	closed = true
-	if err := t.store.hooks.close(file); err != nil {
+	if err := t.store.closeFile(file); err != nil {
 		return storageFailure(name, err)
 	}
 	return ctx.Err()

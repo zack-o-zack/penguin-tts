@@ -2,8 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
-	"io/fs"
 	"maps"
 	"path"
 
@@ -13,7 +11,7 @@ import (
 func (m *Manager) preflight(j *job, bundle catalog.Bundle, headroom int64) error {
 	var retained int64
 	_ = m.withLock(func() error {
-		sizes := m.stagedSizesLocked(j)
+		sizes := m.store.stagedSizes(j.StagingID, j.Artifacts)
 		retained = sumSizes(sizes)
 		maps.Copy(j.fileBytes, sizes)
 		return nil
@@ -32,9 +30,10 @@ func (m *Manager) runDownload(ctx context.Context, j *job, bundle catalog.Bundle
 	if err := m.preflight(j, bundle, bundle.Space.StagingHeadroomBytes); err != nil {
 		return err
 	}
-	budgets := map[string]int{}
+	budgets := map[string]*int{}
 	for _, artifact := range bundle.Artifacts {
-		budgets[artifact.Path] = maxTransferAttempts
+		attempts := maxTransferAttempts
+		budgets[artifact.Path] = &attempts
 	}
 	verified := map[string]fileCheck{}
 	for {
@@ -45,10 +44,7 @@ func (m *Manager) runDownload(ctx context.Context, j *job, bundle catalog.Bundle
 			if _, done := verified[artifact.Path]; done {
 				continue
 			}
-			budget := budgets[artifact.Path]
-			err := m.transferArtifact(ctx, j, artifact, &budget)
-			budgets[artifact.Path] = budget
-			if err != nil {
+			if err := m.transferArtifact(ctx, j, artifact, budgets[artifact.Path]); err != nil {
 				return err
 			}
 		}
@@ -68,7 +64,7 @@ func (m *Manager) runDownload(ctx context.Context, j *job, bundle catalog.Bundle
 				if clearErr := m.clearStaged(j, artifact); clearErr != nil {
 					return clearErr
 				}
-				if budgets[artifact.Path] <= 0 {
+				if *budgets[artifact.Path] <= 0 {
 					return err
 				}
 				retry = true
@@ -115,8 +111,7 @@ func (m *Manager) transferArtifact(ctx context.Context, j *job, artifact catalog
 // clearStaged removes bytes that failed verification so retries start clean.
 func (m *Manager) clearStaged(j *job, artifact catalog.Artifact) error {
 	return m.withLock(func() error {
-		err := m.store.root.Remove(stagingFile(j.StagingID, artifact.Path))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err := m.store.removeStagedFile(j.StagingID, artifact.Path); err != nil {
 			return storageError(CodeWriteFailed, artifact.Path, err)
 		}
 		j.artifact(artifact.Path).ETag = ""

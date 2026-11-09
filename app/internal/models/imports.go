@@ -268,7 +268,7 @@ func (m *Manager) copyArtifact(ctx context.Context, j *job, artifact catalog.Art
 		return newError(CodeSizeMismatch, artifact.Path, nil)
 	}
 	closed = true
-	if err := m.hooks.close(destination); err != nil {
+	if err := m.store.closeFile(destination); err != nil {
 		return storageError(CodeWriteFailed, artifact.Path, err)
 	}
 	return nil
@@ -291,22 +291,14 @@ func (m *Manager) RemoveInstallation(installationID string) error {
 		if install.Ownership == OwnershipExternal {
 			return m.commitInstallsLocked(next)
 		}
-		final := installDir(install.BundleID, install.ManifestSHA256)
-		aside := path.Join(replacedRoot, install.ID)
-		moved := true
-		if err := m.hooks.rename(m.store.root, final, aside); err != nil {
-			if !isNotExist(err) {
-				return storageError(CodeWriteFailed, "", err)
-			}
-			moved = false
-		}
-		if err := m.commitInstallsLocked(next); err != nil {
-			if moved {
-				_ = m.hooks.rename(m.store.root, aside, final)
-			}
+		change, err := m.store.uninstall(install.ID, install.BundleID, install.ManifestSHA256)
+		if err != nil {
 			return err
 		}
-		return m.removeTrash(aside)
+		if err := m.commitInstallsLocked(next); err != nil {
+			return errors.Join(err, change.rollback())
+		}
+		return change.finish()
 	})
 }
 
@@ -315,17 +307,6 @@ func (j *job) ownership() Ownership {
 		return OwnershipExternal
 	}
 	return OwnershipManaged
-}
-
-func (m *Manager) removeTrash(aside string) error {
-	if err := m.store.root.RemoveAll(aside); err != nil {
-		return storageError(CodeWriteFailed, "", err)
-	}
-	return nil
-}
-
-func isNotExist(err error) bool {
-	return errors.Is(err, os.ErrNotExist)
 }
 
 // Revalidate re-hashes every file of an installation and records the result.

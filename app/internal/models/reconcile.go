@@ -2,9 +2,6 @@ package models
 
 import (
 	"context"
-	"errors"
-	"io/fs"
-	"path"
 )
 
 func (m *Manager) reconcile(ctx context.Context) error {
@@ -32,47 +29,31 @@ func (m *Manager) reconcile(ctx context.Context) error {
 			StagingID: id, ErrorCode: CodeInvalidJournal,
 		}}
 	}
-	m.restoreReplaced()
-	m.clearReplaced()
+	m.store.recoverParked(m.parkOwners())
 	if err := m.adoptOrphans(ctx); err != nil {
 		return err
 	}
 	return m.reconcileJobs()
 }
 
-// restoreReplaced undoes a publication that died between moving the old
-// directory aside and moving the new one in.
-func (m *Manager) restoreReplaced() {
-	for _, j := range m.jobs {
-		aside := path.Join(replacedRoot, j.JobID)
-		if _, err := m.store.root.Lstat(aside); err != nil {
-			continue
-		}
-		final := installDir(j.BundleID, j.ManifestSHA256)
-		if _, err := m.store.root.Lstat(final); errors.Is(err, fs.ErrNotExist) {
-			_ = m.hooks.rename(m.store.root, aside, final)
+// parkOwners names the final directory of every change still on record.
+func (m *Manager) parkOwners() map[string]string {
+	owners := map[string]string{}
+	for id, j := range m.jobs {
+		owners[id] = installDir(j.BundleID, j.ManifestSHA256)
+	}
+	for _, install := range m.installs {
+		if install.Ownership == OwnershipManaged {
+			owners[install.ID] = installDir(install.BundleID, install.ManifestSHA256)
 		}
 	}
-}
-
-func (m *Manager) clearReplaced() {
-	entries, err := fs.ReadDir(m.store.root.FS(), replacedRoot)
-	if err != nil {
-		return
-	}
-	for _, entry := range entries {
-		_ = m.store.root.RemoveAll(path.Join(replacedRoot, entry.Name()))
-	}
+	return owners
 }
 
 func (m *Manager) reconcileJobs() error {
 	for id, j := range m.jobs {
 		if j.State == StateInstalled || (j.State == StatePublishing && m.jobCommitted(j)) {
-			if j.StagingID != "" {
-				if _, err := m.store.root.Lstat(stagingDir(j.StagingID)); err == nil {
-					_ = m.store.root.RemoveAll(stagingDir(j.StagingID))
-				}
-			}
+			_ = m.store.discardStaging(j.StagingID)
 			delete(m.jobs, id)
 			if err := m.store.removeJournal(id); err != nil {
 				return storageError(CodeStorageUnavailable, "", err)

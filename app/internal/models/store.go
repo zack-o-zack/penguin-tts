@@ -153,6 +153,19 @@ func (s *store) writeAll(file *os.File, data []byte) error {
 	return err
 }
 
+// closeFile closes a written file through the fault-injection seam.
+func (s *store) closeFile(file *os.File) error {
+	return s.hooks.close(file)
+}
+
+func (s *store) syncAndClose(file *os.File) error {
+	if err := s.hooks.sync(file); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return s.hooks.close(file)
+}
+
 func (s *store) syncDir(rel string) error {
 	dir, err := s.root.Open(rel)
 	if err != nil {
@@ -183,11 +196,7 @@ func (s *store) writeAtomic(rel string, data []byte) (err error) {
 		_ = file.Close()
 		return err
 	}
-	if err := s.hooks.sync(file); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if err := s.hooks.close(file); err != nil {
+	if err := s.syncAndClose(file); err != nil {
 		return err
 	}
 	if err := s.hooks.rename(s.root, temp, rel); err != nil {

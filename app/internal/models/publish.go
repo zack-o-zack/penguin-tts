@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +11,6 @@ import (
 	"os"
 	"path"
 	"slices"
-	"strings"
 	"time"
 
 	"penguin.local/app/internal/catalog"
@@ -128,18 +126,6 @@ func (m *Manager) publish(_ context.Context, j *job, bundle catalog.Bundle, veri
 	if err := m.enterPublishing(j); err != nil {
 		return err
 	}
-	staging := stagingDir(j.StagingID)
-	directories := map[string]bool{staging: true, path.Join(staging, filesDir): true}
-	for _, artifact := range bundle.Artifacts {
-		if err := m.syncVerifiedFile(j, artifact, verified[artifact.Path]); err != nil {
-			return err
-		}
-		for dir := path.Dir(stagingFile(j.StagingID, artifact.Path)); strings.HasPrefix(dir, staging); dir = path.Dir(dir) {
-			directories[dir] = true
-		}
-	}
-	m.hooks.boundary("files-synced")
-
 	sealed := sealedManifest{
 		SchemaVersion:  sealedSchema,
 		BundleID:       bundle.BundleID,
@@ -147,52 +133,18 @@ func (m *Manager) publish(_ context.Context, j *job, bundle catalog.Bundle, veri
 		PublishedAt:    time.Now().UTC(),
 		Artifacts:      sealedArtifacts(bundle),
 	}
-	if err := m.writeSealed(staging, &sealed); err != nil {
+	if err := m.store.seal(j.StagingID, &sealed, verified); err != nil {
 		return err
 	}
-	for dir := range directories {
-		if err := m.store.syncDir(dir); err != nil {
-			return publishError("", err)
-		}
-	}
-	m.hooks.boundary("sealed")
-
-	final := installDir(bundle.BundleID, bundle.ManifestSHA256)
-	if err := m.moveIntoPlace(j, staging, final); err != nil {
+	change, err := m.store.install(j.JobID, j.StagingID, bundle.BundleID, bundle.ManifestSHA256)
+	if err != nil {
 		return err
 	}
-	m.hooks.boundary("renamed")
-
 	if err := m.commitManaged(j, bundle, sealed.Artifacts); err != nil {
-		return errors.Join(err, m.rollbackPublish(j, staging, final))
+		return errors.Join(err, change.rollback())
 	}
-	m.hooks.boundary("registered")
-	_ = m.store.root.RemoveAll(path.Join(replacedRoot, j.JobID))
+	_ = change.finish()
 	return m.markInstalled(j)
-}
-
-func (m *Manager) syncVerifiedFile(j *job, artifact catalog.Artifact, verified fileCheck) error {
-	file, err := m.store.open(stagingFile(j.StagingID, artifact.Path), os.O_RDWR, 0, false)
-	if err != nil {
-		return publishError(artifact.Path, err)
-	}
-	info, err := file.Stat()
-	if err != nil {
-		_ = file.Close()
-		return publishError(artifact.Path, err)
-	}
-	if checkOf(info) != verified {
-		_ = file.Close()
-		return newError(CodeSourceChanged, artifact.Path, nil)
-	}
-	if err := m.hooks.sync(file); err != nil {
-		_ = file.Close()
-		return publishError(artifact.Path, err)
-	}
-	if err := m.hooks.close(file); err != nil {
-		return publishError(artifact.Path, err)
-	}
-	return nil
 }
 
 func sealedFrom(artifact catalog.Artifact) sealedArtifact {
@@ -210,79 +162,6 @@ func sealedArtifacts(bundle catalog.Bundle) []sealedArtifact {
 		artifacts = append(artifacts, sealedFrom(artifact))
 	}
 	return artifacts
-}
-
-func (m *Manager) writeSealed(staging string, sealed *sealedManifest) error {
-	data, err := json.Marshal(sealed)
-	if err != nil {
-		return newError(CodeInternal, "", err)
-	}
-	file, err := m.store.open(path.Join(staging, sealedName), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600, false)
-	if err != nil {
-		return publishError("", err)
-	}
-	if err := m.store.writeAll(file, data); err != nil {
-		_ = file.Close()
-		return publishError("", err)
-	}
-	if err := m.hooks.sync(file); err != nil {
-		_ = file.Close()
-		return publishError("", err)
-	}
-	if err := m.hooks.close(file); err != nil {
-		return publishError("", err)
-	}
-	return nil
-}
-
-func (m *Manager) moveIntoPlace(j *job, staging, final string) error {
-	if err := m.store.root.MkdirAll(path.Dir(final), 0o700); err != nil {
-		return publishError("", err)
-	}
-	info, err := m.store.root.Lstat(staging)
-	if err != nil {
-		return publishError("", err)
-	}
-	if !info.IsDir() {
-		return newError(CodeUnsafePath, "", nil)
-	}
-	aside := path.Join(replacedRoot, j.JobID)
-	if _, err := m.store.root.Lstat(final); err == nil {
-		// Only a damaged copy of the same manifest can already be here; a
-		// verified one would have satisfied the request without a job.
-		if err := m.hooks.rename(m.store.root, final, aside); err != nil {
-			return publishError("", err)
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return publishError("", err)
-	}
-	if err := m.hooks.rename(m.store.root, staging, final); err != nil {
-		return errors.Join(publishError("", err), m.restoreAside(aside, final))
-	}
-	for _, dir := range []string{path.Dir(final), installsRoot, stagingRoot} {
-		if err := m.store.syncDir(dir); err != nil {
-			return errors.Join(publishError("", err), m.rollbackPublish(j, staging, final))
-		}
-	}
-	return nil
-}
-
-// rollbackPublish returns staged bytes to staging and restores what they replaced.
-func (m *Manager) rollbackPublish(j *job, staging, final string) error {
-	if err := m.hooks.rename(m.store.root, final, staging); err != nil {
-		return publishError("", err)
-	}
-	return m.restoreAside(path.Join(replacedRoot, j.JobID), final)
-}
-
-func (m *Manager) restoreAside(aside, final string) error {
-	if _, err := m.store.root.Lstat(aside); err != nil {
-		return nil
-	}
-	if err := m.hooks.rename(m.store.root, aside, final); err != nil {
-		return publishError("", err)
-	}
-	return nil
 }
 
 func (m *Manager) commitManaged(j *job, bundle catalog.Bundle, artifacts []sealedArtifact) error {
@@ -342,41 +221,31 @@ func (m *Manager) markInstalled(j *job) error {
 
 // adoptOrphans finishes a publication interrupted before its registry commit.
 func (m *Manager) adoptOrphans(ctx context.Context) error {
-	bundles, err := fs.ReadDir(m.store.root.FS(), installsRoot)
+	keys, err := m.store.installDirs()
 	if err != nil {
 		return storageError(CodeStorageUnavailable, "", err)
 	}
 	changed := false
-	for _, bundleEntry := range bundles {
-		manifests, err := fs.ReadDir(m.store.root.FS(), path.Join(installsRoot, bundleEntry.Name()))
-		if err != nil {
+	for _, key := range keys {
+		existing := m.findInstallLocked(key.bundleID, key.manifest, OwnershipManaged)
+		if existing != nil && (existing.Status == StatusVerified || !m.repairWasMoved(key)) {
 			continue
 		}
-		for _, manifestEntry := range manifests {
-			bundleID, manifest := bundleEntry.Name(), manifestEntry.Name()
-			if !catalog.ValidID(bundleID) || !catalog.ValidDigest(manifest) {
-				continue
+		adopted, err := m.adopt(ctx, key.bundleID, key.manifest)
+		if err != nil {
+			if ctx.Err() != nil {
+				return context.Cause(ctx)
 			}
-			existing := m.findInstallLocked(bundleID, manifest, OwnershipManaged)
-			if existing != nil && (existing.Status == StatusVerified || !m.repairWasMoved(bundleID, manifest)) {
-				continue
-			}
-			adopted, err := m.adopt(ctx, bundleID, manifest)
-			if err != nil {
-				if ctx.Err() != nil {
-					return context.Cause(ctx)
-				}
-				m.notice = "An incomplete model folder was left in storage and is not in use."
-				continue
-			}
-			if existing != nil {
-				adopted.ID = existing.ID
-				m.installs = replaceInstall(m.installs, adopted)
-			} else {
-				m.installs = append(m.installs, adopted)
-			}
-			changed = true
+			m.notice = "An incomplete model folder was left in storage and is not in use."
+			continue
 		}
+		if existing != nil {
+			adopted.ID = existing.ID
+			m.installs = replaceInstall(m.installs, adopted)
+		} else {
+			m.installs = append(m.installs, adopted)
+		}
+		changed = true
 	}
 	if changed {
 		if err := m.store.saveRegistry(m.installs); err != nil {
@@ -388,12 +257,10 @@ func (m *Manager) adoptOrphans(ctx context.Context) error {
 
 // repairWasMoved reports a publishing job whose staging already reached the
 // final directory, so that directory holds the repair rather than the damage.
-func (m *Manager) repairWasMoved(bundleID, manifest string) bool {
+func (m *Manager) repairWasMoved(key installKey) bool {
 	for _, j := range m.jobs {
-		if j.State != StatePublishing || j.Kind == KindReference || j.BundleID != bundleID || j.ManifestSHA256 != manifest {
-			continue
-		}
-		if _, err := m.store.root.Lstat(stagingDir(j.StagingID)); errors.Is(err, fs.ErrNotExist) {
+		if j.State == StatePublishing && j.Kind != KindReference && j.BundleID == key.bundleID &&
+			j.ManifestSHA256 == key.manifest && m.store.stagingGone(j.StagingID) {
 			return true
 		}
 	}

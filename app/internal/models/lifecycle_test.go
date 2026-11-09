@@ -770,6 +770,43 @@ func TestSymlinkedStateDirectoryIsRejected(t *testing.T) {
 	}
 }
 
+func TestCrashDuringRemovalKeepsInstall(t *testing.T) {
+	h := newHarness(t, single(payload), serveFile(payload))
+	h.open()
+	h.waitState(h.download(), StateInstalled)
+	install := h.manager.ListInstallations().Installations[0]
+	if err := h.manager.Close(); err != nil {
+		t.Fatal(err)
+	}
+	parked := filepath.Join(h.root, filepath.FromSlash(replacedRoot))
+	final := filepath.Join(h.root, filepath.FromSlash(installDir(h.bundle.BundleID, h.bundle.ManifestSHA256)))
+	must(t, os.Rename(final, filepath.Join(parked, install.ID)))
+	unknown := filepath.Join(parked, "ins-unknown")
+	must(t, os.Mkdir(unknown, 0o700))
+
+	h.open()
+	h.assertInstalled(payload)
+	if _, err := os.Stat(unknown); !os.IsNotExist(err) {
+		t.Fatalf("unowned parked directory survived: %v", err)
+	}
+}
+
+func TestFailedRemovalCommitKeepsFiles(t *testing.T) {
+	h := newHarness(t, single(payload), serveFile(payload))
+	var armed atomic.Bool
+	hooks := defaultHooks()
+	hooks.rename = onceFailingRename(&armed, registryFile)
+	h.controls.hooks = &hooks
+	h.open()
+	h.waitState(h.download(), StateInstalled)
+	install := h.manager.ListInstallations().Installations[0]
+	armed.Store(true)
+	if err := h.manager.RemoveInstallation(install.ID); err == nil {
+		t.Fatal("removal succeeded without a registry commit")
+	}
+	h.assertInstalled(payload)
+}
+
 func TestSymlinkSubstitutionIsRejected(t *testing.T) {
 	outsideDir := t.TempDir()
 	victim := filepath.Join(outsideDir, fixtureFile)
