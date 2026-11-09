@@ -10,6 +10,6 @@
     "lint:go": "node ../scripts/check-go-format.mjs",
     "format:go": "gofmt -w .",
     "test": "pnpm bindings && pnpm --filter @penguin/frontend build && go vet ./... && go test ./...",
-    "serve:e2e": "go run -tags server,production ."
+    "serve:e2e": "go run -tags server,production,e2e ."
   }
 }

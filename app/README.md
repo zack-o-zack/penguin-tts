@@ -12,7 +12,11 @@ The frontend builds into `frontend/dist`, which Go embeds. Run root `pnpm build:
 
 `build/` contains desktop platform recipes and starter packaging assets from the Wails template. The bundle identifier, icon, signing, entitlements, and distribution metadata must be reviewed before release. Generated bindings, compiled assets, and binaries are ignored.
 
-Add real domain code and tests as features are implemented. No speech engine, API-key storage, or inference runtime is connected in this boilerplate.
+Add real domain code and tests as features are implemented. No speech engine, API-key storage, or inference runtime is connected yet.
+
+## Local models
+
+`internal/catalog` holds the reviewed bundle list embedded in each build. A bundle can be downloaded only when all of its license evidence is approved in `internal/catalog/catalog.json`. `internal/models` owns downloads, verification, imports and installed files under `~/Library/Application Support/app.penguin.tts`. "Files verified" means every file matched the catalog; it says nothing about speech engine compatibility.
 
 ## End-to-end tests
 

@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "descriptors": [
+    {
+      "schemaVersion": 1,
+      "catalogVersion": "2026.11.1",
+      "modelId": "kokoro-82m",
+      "variantId": "onnx-int8",
+      "bundleId": "kokoro-v1-onnx-int8-af-heart",
+      "voiceIds": ["af-heart"],
+      "displayName": "Kokoro v1.0 (int8), Heart voice",
+      "publisher": "onnx-community",
+      "description": "Community ONNX conversion of Kokoro 82M with quantized weights and one American English voice.",
+      "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/tree/1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+      "modelCardUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/blob/1939ad2a8e416c0acfeecc08a694d14ef25f2231/README.md",
+      "releaseLabel": "v1.0",
+      "languages": ["en-US"],
+      "speakers": 1,
+      "sampleRateHz": 24000,
+      "format": "onnx",
+      "precision": "int8",
+      "capabilities": null,
+      "engine": {
+        "status": "unknown",
+        "evidence": null,
+        "constraints": null
+      },
+      "artifacts": [
+        {
+          "artifactId": "config",
+          "repository": "onnx-community/Kokoro-82M-v1.0-ONNX",
+          "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+          "path": "config.json",
+          "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/config.json",
+          "sizeBytes": 44,
+          "sha256": "df34b4f930b23447cd4dc410fabfb42eb3f24e803e6c3f97d618fb359380a36f",
+          "hashSource": "fetched-small-file-and-host-metadata",
+          "hashObservedAt": "2026-11-07",
+          "voiceId": null
+        },
+        {
+          "artifactId": "model-quantized",
+          "repository": "onnx-community/Kokoro-82M-v1.0-ONNX",
+          "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+          "path": "onnx/model_quantized.onnx",
+          "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_quantized.onnx",
+          "sizeBytes": 92361116,
+          "sha256": "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478",
+          "hashSource": "pinned-host-lfs-metadata",
+          "hashObservedAt": "2026-11-07",
+          "voiceId": null
+        },
+        {
+          "artifactId": "tokenizer",
+          "repository": "onnx-community/Kokoro-82M-v1.0-ONNX",
+          "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+          "path": "tokenizer.json",
+          "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer.json",
+          "sizeBytes": 3497,
+          "sha256": "77a02c8e164413299b4b4c403b14f8e0e1c1b727db4d46a09d6327b861060a34",
+          "hashSource": "fetched-small-file-and-host-metadata",
+          "hashObservedAt": "2026-11-07",
+          "voiceId": null
+        },
+        {
+          "artifactId": "tokenizer-config",
+          "repository": "onnx-community/Kokoro-82M-v1.0-ONNX",
+          "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+          "path": "tokenizer_config.json",
+          "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer_config.json",
+          "sizeBytes": 113,
+          "sha256": "be1cb066d6ef6b074b3f15e6a6dd21ac88ff3cdaedf325f0aaed686c70f75d20",
+          "hashSource": "fetched-small-file-and-host-metadata",
+          "hashObservedAt": "2026-11-07",
+          "voiceId": null
+        },
+        {
+          "artifactId": "voice-af-heart",
+          "repository": "onnx-community/Kokoro-82M-v1.0-ONNX",
+          "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+          "path": "voices/af_heart.bin",
+          "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices/af_heart.bin",
+          "sizeBytes": 522240,
+          "sha256": "d583ccff3cdca2f7fae535cb998ac07e9fcb90f09737b9a41fa2734ec44a8f0b",
+          "hashSource": "pinned-host-lfs-metadata",
+          "hashObservedAt": "2026-11-07",
+          "voiceId": "af-heart"
+        }
+      ],
+      "licensing": [
+        {
+          "kind": "model",
+          "subject": "hexgrad/Kokoro-82M",
+          "sourceUrl": "https://huggingface.co/hexgrad/Kokoro-82M/blob/f3ff3571791e39611d31c381e3a41a3af07b4987/README.md",
+          "sourceRevision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+          "licenseId": "Apache-2.0",
+          "attribution": "Kokoro v1.0 by hexgrad, licensed under Apache-2.0.",
+          "acceptanceRequired": false,
+          "distributionReview": "approved"
+        },
+        {
+          "kind": "conversion",
+          "subject": "onnx-community/Kokoro-82M-v1.0-ONNX",
+          "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/blob/1939ad2a8e416c0acfeecc08a694d14ef25f2231/README.md",
+          "sourceRevision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+          "licenseId": "Apache-2.0",
+          "attribution": "ONNX conversion by onnx-community, licensed under Apache-2.0.",
+          "acceptanceRequired": false,
+          "distributionReview": "approved"
+        },
+        {
+          "kind": "voice",
+          "subject": "af_heart voice",
+          "sourceUrl": "https://huggingface.co/hexgrad/Kokoro-82M/blob/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_heart.pt",
+          "sourceRevision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+          "licenseId": "Apache-2.0",
+          "attribution": "Heart voice from hexgrad/Kokoro-82M, licensed under Apache-2.0.",
+          "acceptanceRequired": false,
+          "distributionReview": "approved"
+        },
+        {
+          "kind": "dataset",
+          "subject": "CC BY audio in the Kokoro v1.0 training set",
+          "sourceUrl": "https://huggingface.co/hexgrad/Kokoro-82M/blob/f3ff3571791e39611d31c381e3a41a3af07b4987/README.md",
+          "sourceRevision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+          "licenseId": "CC-BY-3.0 AND CC-BY-4.0",
+          "attribution": "Training audio includes Koniwa (CC BY 3.0) and SIWIS (CC BY 4.0), as credited on the Kokoro model card.",
+          "acceptanceRequired": false,
+          "distributionReview": "approved"
+        },
+        {
+          "kind": "companion",
+          "subject": "config.json, tokenizer.json, and tokenizer_config.json",
+          "sourceUrl": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/blob/1939ad2a8e416c0acfeecc08a694d14ef25f2231/README.md",
+          "sourceRevision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+          "licenseId": "Apache-2.0",
+          "attribution": "Configuration files from onnx-community/Kokoro-82M-v1.0-ONNX, licensed under Apache-2.0.",
+          "acceptanceRequired": false,
+          "distributionReview": "approved"
+        }
+      ],
+      "space": {
+        "requiredBytes": 92887010,
+        "installedBytes": 92887010,
+        "stagingHeadroomBytes": 67108864,
+        "copyHeadroomBytes": 67108864,
+        "memoryBytes": null
+      }
+    }
+  ]
+}

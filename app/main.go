@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"penguin.local/app/internal/models"
 )
 
 //go:embed all:frontend/dist
@@ -21,6 +23,8 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+
+	app.RegisterService(models.WailsService(app, modelConfig()))
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     "Penguin",

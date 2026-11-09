@@ -1,8 +1,9 @@
-import { ArrowUpIcon, AudioLinesIcon } from "lucide-react";
-import { type CSSProperties, useRef } from "react";
+import { ArrowUpIcon, AudioLinesIcon, BoxIcon } from "lucide-react";
+import { type CSSProperties, useRef, useSyncExternalStore } from "react";
 import mark from "@/assets/brand/penguin-mark.svg";
 import inverseMark from "@/assets/brand/penguin-mark-inverse.svg";
 import { AppearanceControls } from "@/components/appearance-controls";
+import { ModelsDialog, ModelsPage } from "@/components/models-page";
 import {
   InputGroup,
   InputGroupAddon,
@@ -79,7 +80,17 @@ function SpeechInput() {
   );
 }
 
+function subscribeToHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
+function currentView() {
+  return window.location.hash === "#models" ? "models" : "speech";
+}
+
 function Workspace() {
+  const view = useSyncExternalStore(subscribeToHash, currentView);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { open, openMobile, isMobile } = useSidebar();
   const expanded = isMobile ? openMobile : open;
@@ -124,6 +135,12 @@ function Workspace() {
           event.preventDefault();
           triggerRef.current?.focus();
         }}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          if (event.currentTarget instanceof HTMLElement) {
+            event.currentTarget.focus();
+          }
+        }}
         role="complementary"
         aria-label="Sidebar"
         aria-hidden={!expanded}
@@ -134,26 +151,57 @@ function Workspace() {
           <nav aria-label="Workspace">
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive size="lg">
-                  <a href="#speech" aria-current="page">
+                <SidebarMenuButton
+                  asChild
+                  isActive={view === "speech"}
+                  size="lg"
+                >
+                  <a
+                    href="#speech"
+                    aria-current={view === "speech" ? "page" : undefined}
+                  >
                     <AudioLinesIcon aria-hidden="true" />
                     <span>Text to speech</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={view === "models"}
+                  size="lg"
+                >
+                  <a
+                    href="#models"
+                    aria-current={view === "models" ? "page" : undefined}
+                  >
+                    <BoxIcon aria-hidden="true" />
+                    <span>Models</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </nav>
         </SidebarContent>
-        <SidebarFooter className="px-6 pb-5 text-xs leading-relaxed text-muted-foreground">
-          <p>Local first. Open source.</p>
+        <SidebarFooter className="items-start px-4 pb-4">
+          <ModelsDialog />
         </SidebarFooter>
       </Sidebar>
       <main
         id="speech"
+        hidden={view !== "speech"}
         className="flex min-w-0 flex-1 items-center justify-center px-4 pt-[calc(var(--header-height)+3rem)] pb-12 sm:px-6 lg:px-16"
       >
         <SpeechInput />
       </main>
+      {view === "models" && (
+        <main
+          id="models"
+          className="mt-(--header-height) h-[calc(100svh-var(--header-height))] min-w-0 flex-1 overflow-y-auto px-4 pt-6 pb-12 sm:px-6 lg:px-16"
+        >
+          <ModelsPage />
+        </main>
+      )}
     </>
   );
 }
