@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type CatalogEntry,
   type InstallationList,
+  type JobList,
   type JobSnapshot,
   Service,
 } from "../../bindings/penguin.local/app/internal/models";
@@ -31,58 +32,80 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function useModelLibrary() {
-  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
-  const [jobs, setJobs] = useState<JobMap>(new Map());
+function mergeJob(current: JobMap, job: JobSnapshot): JobMap {
+  const existing = current.get(job.jobId);
+  if (existing && existing.sequence >= job.sequence) return current;
+  const next = new Map(current);
+  if (job.removed) next.delete(job.jobId);
+  else next.set(job.jobId, job);
+  return next;
+}
+
+// Events delivered during the fetch stay when they are newer than the list.
+function mergeJobList(
+  current: JobMap,
+  list: JobList,
+  removed: ReadonlySet<string>,
+): JobMap {
+  const next = new Map<string, JobSnapshot>();
+  for (const job of list.jobs ?? []) {
+    if (removed.has(job.jobId)) continue;
+    const newer = current.get(job.jobId);
+    next.set(job.jobId, newer && newer.sequence > job.sequence ? newer : job);
+  }
+  for (const [id, job] of current) {
+    if (!next.has(id) && job.sequence > list.sequence) next.set(id, job);
+  }
+  return next;
+}
+
+function useInstallations() {
   const [installations, setInstallations] = useState<InstallationList | null>(
     null,
   );
+
+  const refresh = useCallback(async () => {
+    const list = await Service.ListInstallations();
+    setInstallations((current) =>
+      current && current.sequence > list.sequence ? current : list,
+    );
+  }, []);
+
+  useEffect(
+    () =>
+      Events.On("models:installations", () => {
+        void refresh().catch(() => {});
+      }),
+    [refresh],
+  );
+
+  return { installations, refresh };
+}
+
+export function useModelLibrary() {
+  const { installations, refresh } = useInstallations();
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [jobs, setJobs] = useState<JobMap>(new Map());
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  const removedJobs = useRef(new Map<string, number>());
-  const refreshRef = useRef<() => Promise<void>>(async () => {});
+  const removedJobs = useRef(new Set<string>());
 
   useEffect(() => {
     let active = true;
 
-    const refreshInstallations = async () => {
-      const list = await Service.ListInstallations();
-      if (active) {
-        setInstallations((current) =>
-          current && current.sequence > list.sequence ? current : list,
-        );
-      }
-    };
-    refreshRef.current = refreshInstallations;
-
     const applyJob = (job: JobSnapshot) => {
-      if (job.removed) {
-        removedJobs.current.set(job.jobId, job.sequence);
-      } else if (removedJobs.current.has(job.jobId)) {
-        return; // Job IDs are never reused, so this is a delayed event.
-      }
-      setJobs((current) => {
-        const existing = current.get(job.jobId);
-        if (existing && existing.sequence >= job.sequence) return current;
-        const next = new Map(current);
-        if (job.removed) next.delete(job.jobId);
-        else next.set(job.jobId, job);
-        return next;
-      });
+      // Job IDs are never reused, so anything after removal is a delayed event.
+      if (removedJobs.current.has(job.jobId)) return;
+      if (job.removed) removedJobs.current.add(job.jobId);
+      setJobs((current) => mergeJob(current, job));
       if (job.removed) return;
       setAnnouncement(`${job.displayName}: ${jobStateLabel(job.state)}`);
-      if (settledStates.has(job.state)) {
-        void refreshInstallations().catch(() => {});
-      }
+      if (settledStates.has(job.state)) void refresh().catch(() => {});
     };
 
     const offJob = Events.On("models:job", (event) => {
-      const job: JobSnapshot = event.data;
-      applyJob(job);
-    });
-    const offInstallations = Events.On("models:installations", () => {
-      void refreshInstallations().catch(() => {});
+      applyJob(event.data);
     });
 
     // Subscribe first, so nothing published during the fetch is missed.
@@ -91,28 +114,11 @@ export function useModelLibrary() {
         const [entries, list] = await Promise.all([
           Service.ListCatalog(),
           Service.ListJobs(),
-          refreshInstallations(),
+          refresh(),
         ]);
         if (!active) return;
         setCatalog(entries ?? []);
-        setJobs((current) => {
-          const next = new Map<string, JobSnapshot>();
-          for (const job of list.jobs ?? []) {
-            const removedAt = removedJobs.current.get(job.jobId) ?? -1;
-            const newer = current.get(job.jobId);
-            if (removedAt >= job.sequence) continue;
-            next.set(
-              job.jobId,
-              newer && newer.sequence > job.sequence ? newer : job,
-            );
-          }
-          for (const [id, job] of current) {
-            if (!next.has(id) && job.sequence > list.sequence) {
-              next.set(id, job);
-            }
-          }
-          return next;
-        });
+        setJobs((current) => mergeJobList(current, list, removedJobs.current));
         setError(null);
       } catch (loadError) {
         if (active) setError(errorMessage(loadError));
@@ -125,19 +131,21 @@ export function useModelLibrary() {
     return () => {
       active = false;
       offJob();
-      offInstallations();
     };
-  }, []);
+  }, [refresh]);
 
-  const run = useCallback(async (action: () => Promise<unknown>) => {
-    try {
-      setError(null);
-      await action();
-      await refreshRef.current();
-    } catch (actionError) {
-      setError(errorMessage(actionError));
-    }
-  }, []);
+  const run = useCallback(
+    async (action: () => Promise<unknown>) => {
+      try {
+        setError(null);
+        await action();
+        await refresh();
+      } catch (actionError) {
+        setError(errorMessage(actionError));
+      }
+    },
+    [refresh],
+  );
 
   return {
     catalog,

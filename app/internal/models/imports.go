@@ -55,7 +55,7 @@ func (m *Manager) ImportFolder(bundleID, folder string, mode ImportMode) (result
 			return newError(CodeInvalidState, "", errors.New("unknown import mode"))
 		}
 		installationID := ""
-		if install := m.findInstallLocked(bundle, ownership); install != nil {
+		if install := m.findInstallLocked(bundle.BundleID, bundle.ManifestSHA256, ownership); install != nil {
 			if install.Status == StatusVerified {
 				result = EnqueueResult{InstallationID: install.ID}
 				return nil
@@ -158,7 +158,7 @@ func (m *Manager) verifyExternal(ctx context.Context, j *job, folder string, art
 				m.reportProgress(j, func() { j.verified[artifact.Path] = done })
 			}
 		}
-		check, err := hashFile(ctx, folderReader(folder), artifact.Path, artifact.Path, artifact.SizeBytes, artifact.SHA256, progress)
+		check, err := hashFile(ctx, folderReader(folder), artifact.Path, artifact, progress)
 		if err != nil {
 			return nil, err
 		}
@@ -346,7 +346,7 @@ func (m *Manager) Revalidate(ctx context.Context, installationID string) error {
 	var failure *Error
 	for _, artifact := range snapshot.Artifacts {
 		m.hashing(artifact.Path)
-		check, err := hashFile(ctx, open, path.Join(prefix, artifact.Path), artifact.Path, artifact.SizeBytes, artifact.SHA256, nil)
+		check, err := hashFile(ctx, open, path.Join(prefix, artifact.Path), artifact, nil)
 		if err != nil {
 			if ctx.Err() != nil {
 				return context.Cause(ctx)

@@ -57,21 +57,21 @@ func folderReader(folder string) fileOpener {
 
 // hashFile streams one file against its expected size and digest, reading at
 // most one byte beyond the size limit.
-func hashFile(ctx context.Context, open fileOpener, rel, artifact string, size int64, expected string, progress func(int64)) (fileCheck, error) {
+func hashFile(ctx context.Context, open fileOpener, rel string, want sealedArtifact, progress func(int64)) (fileCheck, error) {
 	file, err := open(rel)
 	if err != nil {
-		return fileCheck{}, openError(artifact, err)
+		return fileCheck{}, openError(want.Path, err)
 	}
 	defer file.Close()
 	before, err := file.Stat()
 	if err != nil {
-		return fileCheck{}, openError(artifact, err)
+		return fileCheck{}, openError(want.Path, err)
 	}
-	if before.Size() != size {
-		return fileCheck{}, newError(CodeSizeMismatch, artifact, nil)
+	if before.Size() != want.SizeBytes {
+		return fileCheck{}, newError(CodeSizeMismatch, want.Path, nil)
 	}
 	hash := sha256.New()
-	reader := io.LimitReader(file, size+1)
+	reader := io.LimitReader(file, want.SizeBytes+1)
 	buffer := make([]byte, hashBufferSize)
 	var total int64
 	for {
@@ -88,21 +88,21 @@ func hashFile(ctx context.Context, open fileOpener, rel, artifact string, size i
 			break
 		}
 		if readErr != nil {
-			return fileCheck{}, openError(artifact, readErr)
+			return fileCheck{}, openError(want.Path, readErr)
 		}
 	}
 	after, err := file.Stat()
 	if err != nil {
-		return fileCheck{}, openError(artifact, err)
+		return fileCheck{}, openError(want.Path, err)
 	}
 	if checkOf(before) != checkOf(after) {
-		return fileCheck{}, newError(CodeSourceChanged, artifact, nil)
+		return fileCheck{}, newError(CodeSourceChanged, want.Path, nil)
 	}
-	if total != size {
-		return fileCheck{}, newError(CodeSizeMismatch, artifact, nil)
+	if total != want.SizeBytes {
+		return fileCheck{}, newError(CodeSizeMismatch, want.Path, nil)
 	}
-	if hex.EncodeToString(hash.Sum(nil)) != expected {
-		return fileCheck{}, newError(CodeHashMismatch, artifact, nil)
+	if hex.EncodeToString(hash.Sum(nil)) != want.SHA256 {
+		return fileCheck{}, newError(CodeHashMismatch, want.Path, nil)
 	}
 	return checkOf(after), nil
 }
@@ -114,9 +114,7 @@ func (m *Manager) enterPublishing(j *job) error {
 			return errStopped
 		}
 		j.State = StatePublishing
-		err := m.persistLocked(j)
-		m.emitJobLocked(j)
-		return err
+		return m.saveAndEmitLocked(j)
 	})
 }
 
@@ -197,15 +195,19 @@ func (m *Manager) syncVerifiedFile(j *job, artifact catalog.Artifact, verified f
 	return nil
 }
 
+func sealedFrom(artifact catalog.Artifact) sealedArtifact {
+	return sealedArtifact{
+		ArtifactID: artifact.ArtifactID,
+		Path:       artifact.Path,
+		SizeBytes:  artifact.Size(),
+		SHA256:     artifact.SHA256,
+	}
+}
+
 func sealedArtifacts(bundle catalog.Bundle) []sealedArtifact {
 	artifacts := make([]sealedArtifact, 0, len(bundle.Artifacts))
 	for _, artifact := range bundle.Artifacts {
-		artifacts = append(artifacts, sealedArtifact{
-			ArtifactID: artifact.ArtifactID,
-			Path:       artifact.Path,
-			SizeBytes:  artifact.Size(),
-			SHA256:     artifact.SHA256,
-		})
+		artifacts = append(artifacts, sealedFrom(artifact))
 	}
 	return artifacts
 }
@@ -285,7 +287,7 @@ func (m *Manager) restoreAside(aside, final string) error {
 
 func (m *Manager) commitManaged(j *job, bundle catalog.Bundle, artifacts []sealedArtifact) error {
 	return m.withLock(func() error {
-		install := m.findInstallLocked(bundle, OwnershipManaged)
+		install := m.findInstallLocked(bundle.BundleID, bundle.ManifestSHA256, OwnershipManaged)
 		next := m.installs
 		entry := &installation{}
 		if install != nil {
@@ -355,7 +357,7 @@ func (m *Manager) adoptOrphans(ctx context.Context) error {
 			if !catalog.ValidID(bundleID) || !catalog.ValidDigest(manifest) {
 				continue
 			}
-			existing := m.managedInstall(bundleID, manifest)
+			existing := m.findInstallLocked(bundleID, manifest, OwnershipManaged)
 			if existing != nil && (existing.Status == StatusVerified || !m.repairWasMoved(bundleID, manifest)) {
 				continue
 			}
@@ -379,15 +381,6 @@ func (m *Manager) adoptOrphans(ctx context.Context) error {
 	if changed {
 		if err := m.store.saveRegistry(m.installs); err != nil {
 			return storageError(CodeStorageUnavailable, "", err)
-		}
-	}
-	return nil
-}
-
-func (m *Manager) managedInstall(bundleID, manifest string) *installation {
-	for _, install := range m.installs {
-		if install.Ownership == OwnershipManaged && install.BundleID == bundleID && install.ManifestSHA256 == manifest {
-			return install
 		}
 	}
 	return nil
@@ -419,7 +412,7 @@ func (m *Manager) adopt(ctx context.Context, bundleID, manifest string) (*instal
 	var total int64
 	for _, artifact := range sealed.Artifacts {
 		rel := path.Join(dir, filesDir, artifact.Path)
-		if _, err := hashFile(ctx, m.store.reader(), rel, artifact.Path, artifact.SizeBytes, artifact.SHA256, nil); err != nil {
+		if _, err := hashFile(ctx, m.store.reader(), rel, artifact, nil); err != nil {
 			return nil, fmt.Errorf("verify sealed artifact: %w", err)
 		}
 		total += artifact.SizeBytes

@@ -2,16 +2,11 @@
 package models
 
 import (
-	"cmp"
 	"context"
 	"errors"
-	"io/fs"
-	"math"
 	"net/http"
-	"path"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -216,13 +211,17 @@ func (m *Manager) persistLocked(j *job) error {
 	return nil
 }
 
+func (m *Manager) saveAndEmitLocked(j *job) error {
+	err := m.persistLocked(j)
+	m.emitJobLocked(j)
+	return err
+}
+
 func (m *Manager) setState(j *job, state State) error {
 	return m.withLock(func() error {
 		j.State = state
 		j.ErrorCode, j.ErrorArtifact = "", ""
-		err := m.persistLocked(j)
-		m.emitJobLocked(j)
-		return err
+		return m.saveAndEmitLocked(j)
 	})
 }
 
@@ -275,6 +274,11 @@ func (j *job) settled() bool {
 
 func (j *job) pending() bool {
 	return j.State != StateInstalled && j.State != StateFailed
+}
+
+// unresumable reports a failure that retrying the same job cannot fix.
+func (j *job) unresumable() bool {
+	return j.ErrorCode == CodeInvalidManifest || j.ErrorCode == CodeInvalidJournal
 }
 
 func (m *Manager) enqueueLocked(kind JobKind, bundle catalog.Bundle, source, installationID string) (EnqueueResult, error) {
@@ -335,9 +339,9 @@ func (m *Manager) findJoinableLocked(bundle catalog.Bundle, kinds ...JobKind) *j
 	return nil
 }
 
-func (m *Manager) findInstallLocked(bundle catalog.Bundle, ownership Ownership) *installation {
+func (m *Manager) findInstallLocked(bundleID, manifest string, ownership Ownership) *installation {
 	for _, install := range m.installs {
-		if install.BundleID == bundle.BundleID && install.ManifestSHA256 == bundle.ManifestSHA256 && install.Ownership == ownership {
+		if install.BundleID == bundleID && install.ManifestSHA256 == manifest && install.Ownership == ownership {
 			return install
 		}
 	}
@@ -359,7 +363,7 @@ func (m *Manager) EnqueueDownload(bundleID string) (result EnqueueResult, err er
 			result = EnqueueResult{JobID: existing.JobID}
 			return nil
 		}
-		if install := m.findInstallLocked(bundle, OwnershipManaged); install != nil && install.Status == StatusVerified {
+		if install := m.findInstallLocked(bundle.BundleID, bundle.ManifestSHA256, OwnershipManaged); install != nil && install.Status == StatusVerified {
 			result = EnqueueResult{InstallationID: install.ID}
 			return nil
 		}
@@ -388,9 +392,7 @@ func (m *Manager) Pause(jobID string) error {
 		switch {
 		case j.State == StateQueued && !j.running:
 			j.State = StatePaused
-			err := m.persistLocked(j)
-			m.emitJobLocked(j)
-			return err
+			return m.saveAndEmitLocked(j)
 		case j.running && j.State != StatePublishing && j.stop == stopNone:
 			m.requestStopLocked(j, stopPause)
 			return nil
@@ -415,7 +417,7 @@ func (m *Manager) Resume(jobID string) error {
 		if !j.settled() {
 			return newError(CodeInvalidState, "", nil)
 		}
-		if j.ErrorCode == CodeInvalidManifest || j.ErrorCode == CodeInvalidJournal {
+		if j.unresumable() {
 			return newError(j.ErrorCode, "", nil)
 		}
 		bundle, err := m.bundleFor(&j.journal)
@@ -427,8 +429,7 @@ func (m *Manager) Resume(jobID string) error {
 		}
 		j.State = StateQueued
 		j.ErrorCode, j.ErrorArtifact = "", ""
-		err = m.persistLocked(j)
-		m.emitJobLocked(j)
+		err = m.saveAndEmitLocked(j)
 		m.signal()
 		return err
 	})
@@ -543,21 +544,31 @@ func (m *Manager) finish(j *job, err error) {
 		} else {
 			j.retained = m.stagedBytesLocked(j)
 		}
-		persistErr := m.persistLocked(j)
-		m.emitJobLocked(j)
-		return persistErr
+		return m.saveAndEmitLocked(j)
 	})
 }
 
-func (m *Manager) stagedBytesLocked(j *job) int64 {
+// stagedSizesLocked reports each regular file in the job's staging by artifact path.
+func (m *Manager) stagedSizesLocked(j *job) map[string]int64 {
+	sizes := map[string]int64{}
 	if j.StagingID == "" {
-		return 0
+		return sizes
 	}
-	var total int64
 	for _, artifact := range j.Artifacts {
 		if info, err := m.store.root.Lstat(stagingFile(j.StagingID, artifact.Path)); err == nil && info.Mode().IsRegular() {
-			total += info.Size()
+			sizes[artifact.Path] = info.Size()
 		}
+	}
+	return sizes
+}
+
+func (m *Manager) stagedBytesLocked(j *job) int64 {
+	return sumSizes(m.stagedSizesLocked(j))
+}
+
+func sumSizes(sizes map[string]int64) (total int64) {
+	for _, size := range sizes {
+		total += size
 	}
 	return total
 }
@@ -575,372 +586,6 @@ func (m *Manager) run(ctx context.Context, j *job) error {
 	default:
 		return m.runReference(ctx, j, bundle)
 	}
-}
-
-func (m *Manager) preflight(j *job, bundle catalog.Bundle, headroom int64) error {
-	var retained int64
-	_ = m.withLock(func() error {
-		retained = m.stagedBytesLocked(j)
-		for _, artifact := range j.Artifacts {
-			if info, err := m.store.root.Lstat(stagingFile(j.StagingID, artifact.Path)); err == nil && info.Mode().IsRegular() {
-				j.fileBytes[artifact.Path] = info.Size()
-			}
-		}
-		return nil
-	})
-	free, err := m.free(path.Join(m.store.base, modelsDir))
-	if err != nil {
-		return nil // Unknown free space still fails safely on the first failed write.
-	}
-	if int64(free) < max(bundle.Space.RequiredBytes-retained, 0)+headroom {
-		return newError(CodeNoSpace, "", nil)
-	}
-	return nil
-}
-
-func (m *Manager) runDownload(ctx context.Context, j *job, bundle catalog.Bundle) error {
-	if err := m.preflight(j, bundle, bundle.Space.StagingHeadroomBytes); err != nil {
-		return err
-	}
-	budgets := map[string]int{}
-	for _, artifact := range bundle.Artifacts {
-		budgets[artifact.Path] = maxTransferAttempts
-	}
-	verified := map[string]fileCheck{}
-	for {
-		if err := m.setState(j, StateDownloading); err != nil {
-			return err
-		}
-		for _, artifact := range bundle.Artifacts {
-			if _, done := verified[artifact.Path]; done {
-				continue
-			}
-			budget := budgets[artifact.Path]
-			err := m.transferArtifact(ctx, j, artifact, &budget)
-			budgets[artifact.Path] = budget
-			if err != nil {
-				return err
-			}
-		}
-		if err := m.setState(j, StateVerifying); err != nil {
-			return err
-		}
-		retry := false
-		for _, artifact := range bundle.Artifacts {
-			if _, done := verified[artifact.Path]; done {
-				continue
-			}
-			check, err := m.verifyStaged(ctx, j, artifact)
-			switch {
-			case err == nil:
-				verified[artifact.Path] = check
-			case isContentMismatch(err):
-				if clearErr := m.clearStaged(j, artifact); clearErr != nil {
-					return clearErr
-				}
-				if budgets[artifact.Path] <= 0 {
-					return err
-				}
-				retry = true
-			default:
-				return err
-			}
-		}
-		if !retry {
-			return m.publish(ctx, j, bundle, verified)
-		}
-	}
-}
-
-func isContentMismatch(err error) bool {
-	failure := asError(err)
-	return failure.Code == CodeHashMismatch || failure.Code == CodeSizeMismatch
-}
-
-func (m *Manager) transferArtifact(ctx context.Context, j *job, artifact catalog.Artifact, budget *int) error {
-	m.setCurrent(j, artifact.Path)
-	return m.tr.transfer(ctx, transferSpec{
-		artifact: artifact,
-		rel:      stagingFile(j.StagingID, artifact.Path),
-		budget:   budget,
-		etag: func() (etag string) {
-			_ = m.withLock(func() error {
-				etag = j.artifact(artifact.Path).ETag
-				return nil
-			})
-			return etag
-		},
-		saveETag: func(etag string) error {
-			return m.withLock(func() error {
-				j.artifact(artifact.Path).ETag = etag
-				return m.persistLocked(j)
-			})
-		},
-		progress: func(size int64) {
-			m.reportProgress(j, func() { j.fileBytes[artifact.Path] = size })
-		},
-	})
-}
-
-// clearStaged removes bytes that failed verification so retries start clean.
-func (m *Manager) clearStaged(j *job, artifact catalog.Artifact) error {
-	return m.withLock(func() error {
-		err := m.store.root.Remove(stagingFile(j.StagingID, artifact.Path))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return storageError(CodeWriteFailed, artifact.Path, err)
-		}
-		j.artifact(artifact.Path).ETag = ""
-		delete(j.fileBytes, artifact.Path)
-		delete(j.verified, artifact.Path)
-		return m.persistLocked(j)
-	})
-}
-
-func (m *Manager) verifyStaged(ctx context.Context, j *job, artifact catalog.Artifact) (fileCheck, error) {
-	m.setCurrent(j, artifact.Path)
-	m.hashing(artifact.Path)
-	return hashFile(ctx, m.store.reader(), stagingFile(j.StagingID, artifact.Path), artifact.Path, artifact.Size(), artifact.SHA256, func(done int64) {
-		m.reportProgress(j, func() { j.verified[artifact.Path] = done })
-	})
-}
-
-func (m *Manager) reconcile(ctx context.Context) error {
-	m.store.removeTemporaries("state")
-	m.store.removeTemporaries(jobsDir)
-
-	installs, recovered, err := m.store.loadRegistry()
-	if err != nil {
-		return storageError(CodeStorageUnavailable, "", err)
-	}
-	m.installs = installs
-	if recovered {
-		m.notice = "Saved model records were damaged and rebuilt. Folders added from outside Penguin may need to be added again."
-	}
-	entries, corrupt, err := m.store.loadJournals()
-	if err != nil {
-		return storageError(CodeStorageUnavailable, "", err)
-	}
-	for _, entry := range entries {
-		m.jobs[entry.JobID] = &job{journal: *entry}
-	}
-	for _, id := range corrupt {
-		m.jobs[id] = &job{journal: journal{
-			SchemaVersion: journalSchema, JobID: id, Kind: KindDownload, State: StateFailed,
-			StagingID: id, ErrorCode: CodeInvalidJournal,
-		}}
-	}
-	m.restoreReplaced()
-	m.clearReplaced()
-	if err := m.adoptOrphans(ctx); err != nil {
-		return err
-	}
-	return m.reconcileJobs()
-}
-
-// restoreReplaced undoes a publication that died between moving the old
-// directory aside and moving the new one in.
-func (m *Manager) restoreReplaced() {
-	for _, j := range m.jobs {
-		aside := path.Join(replacedRoot, j.JobID)
-		if _, err := m.store.root.Lstat(aside); err != nil {
-			continue
-		}
-		final := installDir(j.BundleID, j.ManifestSHA256)
-		if _, err := m.store.root.Lstat(final); errors.Is(err, fs.ErrNotExist) {
-			_ = m.hooks.rename(m.store.root, aside, final)
-		}
-	}
-}
-
-func (m *Manager) clearReplaced() {
-	entries, err := fs.ReadDir(m.store.root.FS(), replacedRoot)
-	if err != nil {
-		return
-	}
-	for _, entry := range entries {
-		_ = m.store.root.RemoveAll(path.Join(replacedRoot, entry.Name()))
-	}
-}
-
-func (m *Manager) reconcileJobs() error {
-	for id, j := range m.jobs {
-		if j.State == StateInstalled || (j.State == StatePublishing && m.jobCommitted(j)) {
-			if j.StagingID != "" {
-				if _, err := m.store.root.Lstat(stagingDir(j.StagingID)); err == nil {
-					_ = m.store.root.RemoveAll(stagingDir(j.StagingID))
-				}
-			}
-			delete(m.jobs, id)
-			if err := m.store.removeJournal(id); err != nil {
-				return storageError(CodeStorageUnavailable, "", err)
-			}
-			continue
-		}
-		if j.ErrorCode != CodeInvalidJournal {
-			if code := m.journalProblem(j); code != "" {
-				j.State, j.ErrorCode, j.ErrorArtifact = StateFailed, code, ""
-				if err := m.persistLocked(j); err != nil {
-					return err
-				}
-			}
-		}
-		switch j.State {
-		case StateQueued, StateDownloading, StateCopying, StateVerifying, StatePublishing:
-			j.State = StateInterrupted
-			if err := m.persistLocked(j); err != nil {
-				return err
-			}
-		}
-		j.retained = m.stagedBytesLocked(j)
-	}
-	return m.refreshInstallStatuses()
-}
-
-// journalProblem binds a recovered journal to the catalog before any resume.
-func (m *Manager) journalProblem(j *job) Code {
-	bundle, err := m.bundleFor(&j.journal)
-	if err != nil {
-		return CodeInvalidManifest
-	}
-	if len(j.Artifacts) != len(bundle.Artifacts) {
-		return CodeInvalidJournal
-	}
-	for index, artifact := range bundle.Artifacts {
-		if j.Artifacts[index].ArtifactID != artifact.ArtifactID || j.Artifacts[index].Path != artifact.Path {
-			return CodeInvalidJournal
-		}
-	}
-	return ""
-}
-
-func (m *Manager) jobCommitted(j *job) bool {
-	for _, install := range m.installs {
-		if install.BundleID != j.BundleID || install.ManifestSHA256 != j.ManifestSHA256 || install.Status != StatusVerified {
-			continue
-		}
-		if j.Kind == KindReference {
-			if install.Ownership == OwnershipExternal && install.Location == j.SourcePath {
-				return true
-			}
-			continue
-		}
-		if install.Ownership == OwnershipManaged {
-			return true
-		}
-	}
-	return false
-}
-
-// sampleRate smooths transfer speed over this run only, so a resumed prefix
-// never counts as speed. A restarted file begins a new measurement.
-func (j *job) sampleRate(now time.Time) {
-	transferred, _ := j.snapshotBytes()
-	if j.rateAt.IsZero() || transferred < j.rateMark {
-		j.rate, j.rateAt, j.rateMark = 0, now, transferred
-		return
-	}
-	current := float64(transferred-j.rateMark) / now.Sub(j.rateAt).Seconds()
-	if j.rate > 0 {
-		current = rateSmoothing*current + (1-rateSmoothing)*j.rate
-	}
-	j.rate, j.rateAt, j.rateMark = current, now, transferred
-}
-
-func (j *job) snapshotBytes() (transferred, verified int64) {
-	for _, size := range j.fileBytes {
-		transferred += size
-	}
-	for _, size := range j.verified {
-		verified += size
-	}
-	return transferred, verified
-}
-
-func (m *Manager) snapshotLocked(j *job) JobSnapshot {
-	transferred, verified := j.snapshotBytes()
-	snapshot := JobSnapshot{
-		JobID:            j.JobID,
-		Kind:             string(j.Kind),
-		BundleID:         j.BundleID,
-		State:            string(j.State),
-		Sequence:         j.sequence,
-		TransferredBytes: transferred,
-		VerifiedBytes:    verified,
-		RetainedBytes:    j.retained,
-		CurrentArtifact:  j.current,
-		ErrorCode:        string(j.ErrorCode),
-		ErrorArtifact:    j.ErrorArtifact,
-		Actions:          j.actions(),
-		CreatedAt:        j.CreatedAt,
-		DisplayName:      cmp.Or(j.BundleID, "Unknown download"),
-	}
-	if j.ErrorCode != "" {
-		snapshot.ErrorMessage = newError(j.ErrorCode, j.ErrorArtifact, nil).Error()
-	}
-	if bundle, ok := m.catalog.Find(j.BundleID); ok {
-		snapshot.DisplayName = bundle.DisplayName
-		if bundle.ManifestSHA256 == j.ManifestSHA256 {
-			snapshot.TotalBytes = bundle.Space.RequiredBytes
-		}
-	}
-	if j.running {
-		snapshot.RetainedBytes = transferred
-	}
-	if j.running && j.stop == stopNone && j.rate > 0 && (j.State == StateDownloading || j.State == StateCopying) {
-		snapshot.BytesPerSecond = int64(j.rate)
-		if snapshot.TotalBytes > transferred {
-			snapshot.SecondsRemaining = int64(math.Ceil(float64(snapshot.TotalBytes-transferred) / j.rate))
-		}
-	}
-	return snapshot
-}
-
-func (j *job) actions() []string {
-	actions := []string{}
-	if j.running && j.stop != stopNone {
-		return actions
-	}
-	switch j.State {
-	case StateQueued, StateDownloading, StateCopying, StateVerifying:
-		return []string{"pause", "cancel"}
-	case StatePaused, StateInterrupted:
-		return []string{"resume", "cancel"}
-	case StateFailed:
-		if j.ErrorCode == CodeInvalidManifest || j.ErrorCode == CodeInvalidJournal {
-			return []string{"cancel"}
-		}
-		return []string{"resume", "cancel"}
-	}
-	return actions
-}
-
-// ListJobs returns an authoritative snapshot.
-func (m *Manager) ListJobs() JobList {
-	var list JobList
-	_ = m.withLock(func() error {
-		list.Sequence = m.sequence
-		list.Jobs = make([]JobSnapshot, 0, len(m.jobs))
-		for _, j := range m.jobs {
-			list.Jobs = append(list.Jobs, m.snapshotLocked(j))
-		}
-		return nil
-	})
-	slices.SortFunc(list.Jobs, func(a, b JobSnapshot) int {
-		if order := a.CreatedAt.Compare(b.CreatedAt); order != 0 {
-			return order
-		}
-		return strings.Compare(a.JobID, b.JobID)
-	})
-	return list
-}
-
-// ListCatalog describes bundles without exposing download URLs.
-func (m *Manager) ListCatalog() []CatalogEntry {
-	entries := make([]CatalogEntry, 0, len(m.catalog.Bundles))
-	for _, bundle := range m.catalog.Bundles {
-		entries = append(entries, newCatalogEntry(bundle))
-	}
-	return entries
 }
 
 func modelsPath(base string) string {

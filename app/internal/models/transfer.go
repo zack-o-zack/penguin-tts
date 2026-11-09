@@ -234,7 +234,7 @@ func (t *transferer) attempt(ctx context.Context, spec transferSpec) (err error)
 	if _, err := file.Seek(offset, io.SeekStart); err != nil {
 		return storageFailure(name, err)
 	}
-	if err := t.copyBody(ctx, cancelRequest, response.Body, file, spec, offset, size-offset); err != nil {
+	if err := t.copyBody(ctx, cancelRequest, response.Body, file, spec, offset); err != nil {
 		return err
 	}
 	closed = true
@@ -332,8 +332,9 @@ func classifyRequestError(ctx context.Context, err error, name string) error {
 	return transient(CodeNetwork, name, err)
 }
 
-func (t *transferer) copyBody(ctx context.Context, cancel context.CancelCauseFunc, body io.Reader, file *os.File, spec transferSpec, offset, remaining int64) error {
+func (t *transferer) copyBody(ctx context.Context, cancel context.CancelCauseFunc, body io.Reader, file *os.File, spec transferSpec, offset int64) error {
 	name := spec.artifact.Path
+	remaining := spec.artifact.Size() - offset
 	idle := time.AfterFunc(t.idle, func() { cancel(errIdleTimeout) })
 	defer idle.Stop()
 	readFailure := func(err error) error {

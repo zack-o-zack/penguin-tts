@@ -1,4 +1,9 @@
-import { ArrowUpIcon, AudioLinesIcon, BoxIcon } from "lucide-react";
+import {
+  ArrowUpIcon,
+  AudioLinesIcon,
+  BoxIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { type CSSProperties, useRef, useSyncExternalStore } from "react";
 import mark from "@/assets/brand/penguin-mark.svg";
 import inverseMark from "@/assets/brand/penguin-mark-inverse.svg";
@@ -85,6 +90,29 @@ function subscribeToHash(onChange: () => void) {
   return () => window.removeEventListener("hashchange", onChange);
 }
 
+function ViewLink({
+  href,
+  active,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+}) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active} size="lg">
+        <a href={href} aria-current={active ? "page" : undefined}>
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </a>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 function currentView() {
   return window.location.hash === "#models" ? "models" : "speech";
 }
@@ -150,36 +178,18 @@ function Workspace() {
         <SidebarContent id="app-sidebar" className="p-4 pt-5">
           <nav aria-label="Workspace">
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={view === "speech"}
-                  size="lg"
-                >
-                  <a
-                    href="#speech"
-                    aria-current={view === "speech" ? "page" : undefined}
-                  >
-                    <AudioLinesIcon aria-hidden="true" />
-                    <span>Text to speech</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={view === "models"}
-                  size="lg"
-                >
-                  <a
-                    href="#models"
-                    aria-current={view === "models" ? "page" : undefined}
-                  >
-                    <BoxIcon aria-hidden="true" />
-                    <span>Models</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              <ViewLink
+                href="#speech"
+                active={view === "speech"}
+                icon={AudioLinesIcon}
+                label="Text to speech"
+              />
+              <ViewLink
+                href="#models"
+                active={view === "models"}
+                icon={BoxIcon}
+                label="Models"
+              />
             </SidebarMenu>
           </nav>
         </SidebarContent>
